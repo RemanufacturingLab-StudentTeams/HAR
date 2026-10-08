@@ -1,4 +1,4 @@
-# Remanufacturing Lab - "Project Name"
+# Remanufacturing Lab - "Human Action Recognition"
 "Brief explanation of project"
 
 # General Overview
