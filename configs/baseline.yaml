@@ -1,0 +1,83 @@
+video_path: "data/Disassembly1.mp4"   # relatief pad
+output_dir: "outputs/Disassembly1"        # relatief pad
+yolo_model: "models/yolo26x.pt"          # pretrained COCO; wordt gedownload als het ontbreekt
+conf_threshold: 0.25
+max_hands: 2
+device: "gpu"                            # "cpu" of "gpu"; --device overschrijft dit
+# auto_install_torch: false              # opt-in: CUDA-torch (~2GB) automatisch installeren bij --device gpu; standaard volgt een foutmelding met installatie-commando
+frame_stride: 2                          # 1 = elk frame
+screenshot_every: 150                    # elke ~5 s bij 30 fps; 0 = geen voorbeeldframes
+save_yolo_video: true                    # debug-video met YOLO-bboxes en labels
+save_handpose_video: true                # debug-video met getekende handlandmarks
+track_high_thresh: 0.25                   # eerste associatie: alleen vrij zekere detecties (minder ruistracks)
+track_low_thresh: 0.1                    # ondergrens voor detecties; lagere scores worden in de tweede associatiestap gebruikt
+new_track_thresh: 0.25                    # minimale score om een nieuwe track te starten (minder kortstondige tracks)
+track_buffer: 30                         # verwerkte frames dat een track zonder detectie blijft bestaan (~2 s videotijd bij frame_stride 2)
+match_thresh: 0.8                        # associatiedrempel voor de eerste stap
+fuse_score: true                         # detectiescore meewegen in de associatie-afstand
+track_trajectory_length: 60              # lengte van de getekende trajectory in de debug-video
+save_tracking_video: true                # debug-video met bboxes, track-ID's en trajectories
+
+# Modelvergelijking: toolrecognition met alternatieve detectie-/segmentatiemodellen
+tool_classes: ["screwdriver", "wrench", "pliers", "cutter", "hammer"]
+yolo_world_model: "models/yolov8x-worldv2.pt"   # YOLO-World v2; tekstprompt uit tool_classes
+yolo_seg_model: "models/yolo26x-seg.pt"         # YOLO26-segmentatie
+rfdetr_model: "RFDETRLarge"                      # RF-DETR-detectie (Apache-2.0-gewichten)
+rfdetr_seg_model: "RFDETRSeg2XLarge"             # RF-DETR-segmentatie
+rfdetr_optimize: true                            # FP16 + compile bij een GPU-run
+grounding_dino_model: "IDEA-Research/grounding-dino-base"
+grounding_dino_text_threshold: 0.25              # drempel voor de promptwoorden in de tekst
+# grounding_dino_prompt: "screwdriver. wrench. ..."  # optioneel: eigen tekstprompt
+# sam3_checkpoint: "models/sam3.pt"              # optioneel: lokaal checkpoint (anders facebook/sam3)
+sam31_model: "models/sam3.1_multiplex.pt"      # SAM 3.1 Object Multiplex via Ultralytics (gated: facebook/sam3.1; handmatig gedownload)
+# sam31_prompts: ["screwdriver", "wrench"]      # optioneel: eigen tekstprompts (anders tool_classes)
+sam31_conf_threshold: 0.30                   # hogere drempel voor de losse SAM 3.1-detectierun; tracking gebruikt de eigen detection_conf
+sam31_imgsz: 896                              # hogere resolutie voor kleine/gedeeltelijk afgedekte gereedschappen; veelvoud van 14
+sam31_tracking:
+  detection_conf: 0.15                       # lage drempel zodat ByteTrack de tweede associatiestap kan gebruiken
+  track_high_thresh: 0.35                    # alleen zekere detecties in de eerste associatiestap
+  track_low_thresh: 0.15                     # ondergrens voor de tweede associatiestap
+  new_track_thresh: 0.35                    # voorkom nieuwe tracks door zwakke SAM 3.1-hypotheses
+  track_buffer: 45                           # langere bescherming tegen korte occlusies bij frame_stride 2
+  match_thresh: 0.70                         # minder agressieve IoU-associatie, dus minder ID-switches
+  fuse_score: true
+save_sam31_video: true                         # debug-video voor SAM 3.1 (beeldinferentie)
+save_sam31_tracking_video: true                # debug-video voor SAM 3.1 + ByteTrack
+save_rfdetr_video: true                          # debug-video per modelstap
+save_rfdetr_seg_video: true
+save_yolo_world_video: true
+save_yolo_seg_video: true
+save_grounding_dino_video: true
+save_sam3_video: true
+# VITRA (zero-shot handactie-voorspelling; https://github.com/microsoft/VITRA)
+vitra_repo_path: "third_party/VITRA"           # eenmalig clonen; niet in git
+vitra_config_path: "VITRA-VLA/VITRA-VLA-3B"    # HF-repo-id of lokaal config.json
+# vitra_model_path: "VITRA-VLA/VITRA-VLA-3B"   # optioneel: lokaal .pt-bestand of HF-repo-id
+# vitra_statistics_path: "..."                 # optioneel: dataset_statistics.json
+vitra_instruction: "Left hand: None. Right hand: Pick up the tool and disassemble the DUPLO model."
+vitra_hands: ["left", "right"]                  # "left", "right" of beide; beide handen kosten nauwelijks extra tijd
+vitra_frame_stride: 30                          # ~1 predictie per seconde bij 30 fps (3B-model is zwaar)
+vitra_sample_times: 1                           # aantal actiesamples per frame (debug toont sample 0)
+vitra_ddim_steps: 10                            # diffusie-stappen in VITRA's actiekop
+vitra_cfg_scale: 5.0                            # classifier-free guidance
+# vitra_fov_deg: [60, 60]                       # null = fov_x uit statebestand + fov_y uit beeldverhouding, anders 60/60
+# vitra_state_path: "third_party/VITRA/examples/0002.npy"  # statische MANO-state (voorbeeld of eigen bestand)
+vitra_reconstruct_hands: true                    # HaWoR + MoGe + MANO per gesampled frame (vereist MANO_RIGHT.pkl)
+vitra_reuse_states: true                         # hergebruik vitra_hand_states.npz als dat al bestaat
+vitra_runtime_path: "third_party/vitra_runtime"  # gepinde transformers 4.47.1 voor de VITRA-inferentie
+# vitra_states_path: "outputs/Disassembly1/vitra/vitra_hand_states.npz"  # expliciet ander statebestand
+vitra_hawor_model_path: "third_party/VITRA/weights/hawor/checkpoints/hawor.ckpt"
+vitra_hawor_detector_path: "third_party/VITRA/weights/hawor/external/detector.pt"
+vitra_moge_model_name: "Ruicheng/moge-2-vitl"
+vitra_mano_path: "third_party/VITRA/weights/mano"
+vitra_image_size: 224                           # korte zijde die VITRA verwacht
+save_vitra_video: true                          # debug-video met instructie en voorspelde handbaan
+vitra_debug_repeat_frames: true                  # herhaal elk voorspelframe tot de bronfps (anders 1 fps video)
+# Snelheid (detectie-neutraal: zelfde imgsz/drempels/gewichten, alleen snellere kernels/codering)
+yolo_half: true                            # FP16-inferentie op CUDA (Ultralytics half=True)
+yolo_fuse: true                            # Conv+BN fusie voor YOLO-modellen
+yolo_backend: "torch"                      # "torch" of "tensorrt" (opt-in .engine-export, valt terug op .pt)
+autocast_fp16: true                        # FP16-autocast voor Grounding DINO en SAM3 op CUDA
+video_encoder: "auto"                      # "auto" (NVENC indien aanwezig, anders x264), "nvenc", "x264" of "mp4v"
+comparison_target_fps: 15                        # doorvoer voor real-time: bronfps / frame_stride
+comparison_weights: {coverage: 0.4, presence: 0.3, speed: 0.3}  # weging in compare_models.py

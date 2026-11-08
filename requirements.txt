@@ -1,0 +1,60 @@
+# Project DUPLO — gepinde dependencies (getest op Python 3.13, Windows, RTX 5080).
+# Installeren via run_common.bat (fast-check, slaat over bij ongewijzigde hash).
+# Gebruik `run_*_test.bat --upgrade` om de hash-check over te slaan en pip
+# opnieuw te laten controleren.
+ultralytics==8.4.177
+lap==0.5.13  # ByteTrack-associatie (ultralytics tracker dependency)
+mediapipe==1.1.1
+opencv-python==5.0.0.93
+pandas==3.0.6
+numpy==2.3.5
+pyyaml==6.0.3
+tqdm==4.67.3
+imageio-ffmpeg==0.6.0
+# Modelvergelijking (toolrecognition): RF-DETR, Grounding DINO, YOLO-World, SAM3 en SAM 3.1
+rfdetr==1.11.2
+transformers==5.19.0
+timm==1.0.30
+supervision==0.30.9
+# SAM3: gewichten van facebook/sam3 vereisen een goedgekeurde Hugging
+# Face-toegangsaanvraag + 'hf auth login'; sam3 verlaagt numpy naar <2.4 en op
+# Windows is triton-windows nodig (sam3 importeert triton).
+# Vastgezet op de PyPI-release: de git-versie van facebookresearch/sam3 pint
+# numpy<2 en numpy 1.x heeft geen wheels voor Python 3.13, dus installeren
+# vanaf git eindigt in een mislukte bronbuild (npy_cdouble/C99-complexfout).
+sam3==0.1.4
+triton-windows==3.8.0.post29; platform_system == "Windows"
+clip @git+https://github.com/ultralytics/CLIP.git@7ffa84b3bfa40c42ecc1c77147a855e69cb2dd40
+# SAM 3.1 (Object Multiplex, sam3.1_multiplex.pt) loopt via ultralytics
+# (SAM3SemanticPredictor) en heeft geen extra package nodig; de gewichten van
+# facebook/sam3.1 vereisen wel een goedgekeurde Hugging Face-toegangsaanvraag
+# + 'huggingface-cli login' (of 'hf auth login').
+# VITRA (optionele handactie-voorspelling): de officiele repo wordt naar
+# third_party/VITRA gecloned en via sys.path geladen. Installeer VITRA zelf
+# NIET met pip: zijn pyproject pint torch 2.3.0, transformers 4.47.1 en
+# numpy<2, wat de rest van dit project zou breken. Alleen deze runtime-
+# dependencies zijn nodig; de PaliGemma-API van transformers 5.x wordt in
+# src/duplo/vitra.py opgevangen.
+sentencepiece==0.2.2
+accelerate==1.15.0
+# VITRA HaWoR/MoGe/MANO-handreconstructie. Initialiseer eerst de submodules:
+#   git -C third_party/VITRA submodule update --init --recursive
+# chumpy staat hier bewust niet tussen: dat pakket faalt met pip-build-isolatie.
+# Installeer het eenmalig met:
+#   pip install --no-build-isolation --no-deps chumpy@git+https://github.com/mattloper/chumpy
+smplx==0.1.28
+yacs==0.1.8
+pytorch_lightning==2.6.6
+omegaconf==2.4.0
+scikit-image==0.26.0
+trimesh==5.2.0
+utils3d @ git+https://github.com/EasternJournalist/utils3d.git@d790d33
+moderngl==5.13.0
+plyfile==1.1.5
+# HaWoR's YOLO-detector vereist dill (Ultralytics installeert het anders zelf).
+dill==0.4.1
+# Voor GPU: torch CUDA-build (2.14.1+cu130) wordt NIET via requirements
+# geinstalleerd, maar via ensure_cuda_torch() met
+# --index-url https://download.pytorch.org/whl/cu130 (opt-in met
+# 'auto_install_torch: true' in de config, anders handmatig installeren).
+# torch==2.14.1, torchvision==0.29.1 zijn de geteste versies.

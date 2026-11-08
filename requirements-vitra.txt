@@ -1,0 +1,16 @@
+# Aparte runtime voor de VITRA-inferentie (transformers 4.47.1).
+#
+# VITRA 0.0.1 is getraind en getest met transformers 4.47.1. Onder
+# transformers 5.x veranderen de PaliGemma-hidden-states en de cognition-token
+# zodanig dat de actiekop 10-100x te grote acties voorspelt. Daarom draait de
+# VITRA-stap in een subprocess met deze pins op de PYTHONPATH; de hoofd-venv
+# blijft op transformers 5.x voor SAM3.
+#
+# Installeren (eenmalig, vanuit de projectmap):
+#   .venv\Scripts\python.exe -m pip install --no-deps --target third_party\vitra_runtime -r requirements-vitra.txt
+#
+# run_vitra_test.bat doet dit automatisch als third_party\vitra_runtime nog
+# niet bestaat. De map staat in .gitignore via third_party/.
+transformers==4.47.1
+tokenizers==0.21.0
+huggingface-hub==0.34.2
