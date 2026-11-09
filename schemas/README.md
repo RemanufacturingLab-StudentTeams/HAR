@@ -21,8 +21,9 @@ Eén rij per geclassificeerde videoclip. De kolomdefinitie staat centraal in
 | `top_k` | string | Top-k scores als `label=score; label=score`. |
 | `raw_response` | string | Optionele ruwe modeluitvoer voor foutanalyse. |
 
-De modellen (X-CLIP, InternVideo2 en ActionCLIP) gebruiken hetzelfde schema,
-zodat `compare_models.py` ze in `action_comparison.csv` kan vergelijken.
+De modellen (X-CLIP, InternVideo2, ActionCLIP, SmolVLM2, InternVideo2.5 en
+InternVideo3) gebruiken hetzelfde schema, zodat `compare_models.py` ze in
+`action_comparison.csv` kan vergelijken.
 `start_s`/`end_s` zijn alleen gevuld bij modellen die temporele grenzen
 voorspellen. `action_eval.py` kan die tijden apart meten tegen
 `action_ground_truth` (IoU, R@IoU en boundary-MAE). VITRA's

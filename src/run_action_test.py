@@ -1,21 +1,28 @@
-"""Actieclassificatie met X-CLIP, InternVideo2 of ActionCLIP.
+"""Actieclassificatie met gespecialiseerde classifiers en generatieve VLM's.
 
 De video wordt in clips verdeeld. Elk model classificeert een clip tegen de
 actieklassen uit ``action_classes`` en schrijft één rij per clip naar
-``<model>_actions.csv``. De debug-video toont per clip het actielabel, de
-confidence en de top-k scores.
+``<model>_actions.csv``. VLM's kunnen daarnaast start/end-tijden voorspellen;
+die worden apart geëvalueerd tegen ``action_ground_truth``. De debug-video
+toont per clip het actielabel, de confidence, de top-k scores en eventueel de
+voorspelde tijden.
 
-Kies het model met ``--model xclip``, ``internvideo2`` of ``actionclip`` (of
-met ``action_model`` in de config). Alle modellen gebruiken dezelfde
-clipindeling en hetzelfde CSV-schema, zodat ``compare_models.py`` ze naast
-elkaar kan zetten.
+Kies het model met ``--model xclip``, ``internvideo2``, ``actionclip``,
+``smolvlm2``, ``internvideo25`` of ``internvideo3`` (of met ``action_model``
+in de config). Alle modellen gebruiken dezelfde clipindeling en hetzelfde
+CSV-schema, zodat ``compare_models.py`` ze naast elkaar kan zetten.
 """
+import os
+import subprocess
+import sys
 import time
+from pathlib import Path
 
 from tqdm import tqdm
 
 from duplo.action_eval import evaluate_action_rows, load_action_ground_truth
 from duplo.actions import (
+    VLM_ACTION_KINDS,
     annotate_action,
     clip_windows,
     create_action_classifier,
@@ -33,12 +40,64 @@ from duplo.pipeline import setup_runtime
 from duplo.schema import ACTION_COLUMNS, action_row
 from duplo.video_writer import DebugVideoWriter
 
+DEFAULT_INTERNVIDEO25_RUNTIME = "third_party/vitra_runtime"
+INTERNVIDEO25_ISOLATED_ENV = "DUPLO_INTERNVIDEO25_ISOLATED"
+
+
+def _transformers_major() -> int | None:
+    try:
+        import transformers
+    except ImportError:
+        return None
+    try:
+        return int(transformers.__version__.split(".")[0])
+    except ValueError:
+        return None
+
+
+def ensure_internvideo25_runtime(cfg: dict) -> None:
+    """Start InternVideo2.5 opnieuw met de transformers 4.x-runtime.
+
+    De remote code van InternVideo2.5 is tegen transformers 4.x gebouwd. Onder
+    transformers 5 laadt het model wel, maar degenereren de logits (het model
+    produceert alleen komma's). Daarom draait deze stap in een subprocess met
+    dezelfde gepinde runtime als VITRA; de hoofd-venv blijft op transformers 5
+    voor SAM3 en InternVideo3.
+    """
+    if os.environ.get(INTERNVIDEO25_ISOLATED_ENV) == "1":
+        return
+    major = _transformers_major()
+    if major is None or major < 5:
+        return
+    runtime = Path(str(cfg.get(
+        "internvideo25_runtime_path", DEFAULT_INTERNVIDEO25_RUNTIME)))
+    if not (runtime / "transformers" / "__init__.py").is_file():
+        raise SystemExit(
+            "InternVideo2.5 vereist transformers 4.x, maar de venv heeft 5.x.\n"
+            "Installeer de aparte runtime (eenmalig):\n"
+            "  .venv\\Scripts\\python.exe -m pip install --no-deps --target "
+            f"{runtime} -r requirements-vitra.txt\n"
+            "Daarna start run_internvideo25_test.bat de stap automatisch in "
+            "een subprocess met die runtime.")
+    env = os.environ.copy()
+    env[INTERNVIDEO25_ISOLATED_ENV] = "1"
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(runtime.resolve()), env["PYTHONPATH"]]
+    ) if env.get("PYTHONPATH") else str(runtime.resolve())
+    print(f"InternVideo2.5 draait in een subprocess met {runtime} "
+          "(transformers 4.47.1).")
+    command = [sys.executable, "-u", str(Path(__file__).resolve()),
+               *sys.argv[1:]]
+    raise SystemExit(subprocess.call(command, env=env))
+
 
 def main(cfg_path: str, device: str | None = None,
          model: str | None = None) -> None:
     cfg = load_config(cfg_path)
     resolve_video_path(cfg)
     kind = normalize_action_model(model or cfg.get("action_model", "xclip"))
+    if kind == "internvideo25":
+        ensure_internvideo25_runtime(cfg)
     out_dir = prepare_output_dir(cfg, kind)
     device = setup_runtime(cfg, device)
 
@@ -47,8 +106,13 @@ def main(cfg_path: str, device: str | None = None,
           f"{len(classifier.classes)} actieklassen")
 
     num_frames = int(classifier.num_frames)
-    span = max(int(cfg.get("action_span", 30)), num_frames)
-    stride = max(1, int(cfg.get("action_stride", span)))
+    is_vlm = kind in VLM_ACTION_KINDS
+    if is_vlm:
+        span = max(int(cfg.get("vlm_clip_span", 90)), num_frames)
+        stride = max(1, int(cfg.get("vlm_clip_stride", span)))
+    else:
+        span = max(int(cfg.get("action_span", 30)), num_frames)
+        stride = max(1, int(cfg.get("action_stride", span)))
     top_k = int(cfg.get("action_top_k", 3))
     screenshot_every = int(cfg.get("screenshot_every", 150))
     repeat_frames = bool(cfg.get("action_debug_repeat_frames", True))
@@ -126,9 +190,11 @@ def main(cfg_path: str, device: str | None = None,
         extra={
             "action_classes": list(classifier.classes),
             "prompts": list(classifier.prompt_set.prompts),
+            "prompt_mode": "vlm_json" if is_vlm else "classifier",
             "clip_frames": num_frames,
             "clip_span": span,
             "clip_stride": stride,
+            "attention": getattr(classifier, "attn_implementation", None),
             "fps": reader.fps,
             "clips_processed": len(rows),
             "video_frames": reader.total_frames,

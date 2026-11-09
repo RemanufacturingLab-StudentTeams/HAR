@@ -73,7 +73,7 @@ vitra_mano_path: "third_party/VITRA/weights/mano"
 vitra_image_size: 224                           # korte zijde die VITRA verwacht
 save_vitra_video: true                          # debug-video met instructie en voorspelde handbaan
 vitra_debug_repeat_frames: true                  # herhaal elk voorspelframe tot de bronfps (anders 1 fps video)
-# Actieclassificatie (InternVideo2, X-CLIP, ActionCLIP)
+# Actieclassificatie (X-CLIP, InternVideo2, ActionCLIP en generatieve VLM's)
 # Elk model classificeert clips tegen deze klassen; pas de lijst aan voor je
 # eigen dataset. Engelse prompts werken het best voor de zero-shot modellen.
 action_classes:
@@ -102,10 +102,30 @@ internvideo2_trust_remote_code: true
 actionclip_model: "ViT-B/32-8"                   # "ViT-B/32-8", "ViT-B/16-8", "ViT-B/16-16" of "ViT-B/16-32"
 # actionclip_checkpoint: "models/vit-b-32-8f.pth"   # optioneel lokaal of URL; leeg = automatisch downloaden
 actionclip_clip_cache: "models/clip"             # cache voor de OpenAI-CLIP ViT-gewichten
+# Generatieve video-VLM's (algemene modellen, geen gespecialiseerde
+# temporele actieclassifiers; label en tijden worden apart gemeten)
+smolvlm2_model: "HuggingFaceTB/SmolVLM2-2.2B-Instruct"
+internvideo25_model: "OpenGVLab/InternVideo2_5_Chat_8B"
+internvideo3_model: "yanziang/InternVideo3-8B-Instruct"
+vlm_frames: 8                                    # frames per clip voor de generatieve VLM's
+vlm_max_new_tokens: 256                          # JSON-antwoord is kort; lager = sneller
+vlm_dtype: "auto"                                # auto = bf16 op GPU, fp32 op CPU
+vlm_device_map: "auto"                         # optioneel: device_map voor grote VLM's
+vlm_attn_implementation: "sdpa"                 # InternVideo3; sdpa of eager
+vlm_clip_span: 90                                # ~3 s context voor temporele VLM's
+vlm_clip_stride: 90                              # volgende VLM-clip elke ~3 s
+# internvideo25_max_num: 1                       # InternVL-tiles per frame (hoger = meer detail/tokens)
+# internvideo25_tokenizer_dir: "models/internvideo25_tokenizer"  # lokale, gesanereerde tokenizer
+internvideo25_runtime_path: "third_party/vitra_runtime"  # gedeelde transformers 4.47-runtime (subprocess)
+internvideo25_attn_implementation: "flash-attn"        # auto = flash-attn als beschikbaar, anders eager
+internvideo3_max_pixels: 131072                  # maximale pixels per frame (128*32*32)
 # action_ground_truth: "data/action_ground_truth.csv"  # optioneel: classificatie + temporele IoU
 save_xclip_video: true                           # debug-video per actiemodel
 save_internvideo2_video: true
 save_actionclip_video: true
+save_smolvlm2_video: true
+save_internvideo25_video: true
+save_internvideo3_video: true
 action_debug_repeat_frames: true                 # herhaal elk clipframe tot de bronfps (anders ~1 fps video)
 # Snelheid (detectie-neutraal: zelfde imgsz/drempels/gewichten, alleen snellere kernels/codering)
 yolo_half: true                            # FP16-inferentie op CUDA (Ultralytics half=True)

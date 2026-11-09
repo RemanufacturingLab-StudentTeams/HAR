@@ -80,6 +80,16 @@ MODEL_SPECS: dict[str, ModelSpec] = {
     "actionclip": ModelSpec(
         "actionclip", "action", "src/run_action_test.py", "actionclip",
         "actionclip_actions.csv", ("--model", "actionclip")),
+    "smolvlm2": ModelSpec(
+        "smolvlm2", "action", "src/run_action_test.py", "smolvlm2",
+        "smolvlm2_actions.csv", ("--model", "smolvlm2")),
+    "internvideo25": ModelSpec(
+        "internvideo25", "action", "src/run_action_test.py",
+        "internvideo25", "internvideo25_actions.csv",
+        ("--model", "internvideo25")),
+    "internvideo3": ModelSpec(
+        "internvideo3", "action", "src/run_action_test.py", "internvideo3",
+        "internvideo3_actions.csv", ("--model", "internvideo3")),
     # Objectdetectie / segmentatie
     "yolo": ModelSpec("yolo", "detection", "src/run_yolo_video.py", "yolo",
                       "yolo_detections.csv"),
@@ -132,6 +142,17 @@ MODEL_ALIASES = {
     "intern_video2": "internvideo2",
     "action-clip": "actionclip",
     "action_clip": "actionclip",
+    "smol-vlm2": "smolvlm2",
+    "smol_vlm2": "smolvlm2",
+    "internvideo2.5": "internvideo25",
+    "internvideo2_5": "internvideo25",
+    "intern-video2.5": "internvideo25",
+    "intern-video-2.5": "internvideo25",
+    "internvideo-2.5": "internvideo25",
+    "internvideo3-8b": "internvideo3",
+    "internvideo3-8b-instruct": "internvideo3",
+    "intervideo3": "internvideo3",
+    "intervideo3-8b": "internvideo3",
     "grounding-dino": "grounding_dino",
     "groundingdino": "grounding_dino",
     "yolo-world": "yolo_world",
@@ -145,6 +166,8 @@ MODEL_ALIASES = {
 PRESETS = {
     "action": ("actionclip", "internvideo2", "xclip"),
     "actions": ("actionclip", "internvideo2", "xclip"),
+    "vlm": ("smolvlm2", "internvideo25", "internvideo3"),
+    "generative": ("smolvlm2", "internvideo25", "internvideo3"),
     "detection": ("grounding_dino", "sam31", "yolo_world"),
     "open_vocabulary": ("grounding_dino", "sam31", "yolo_world"),
     "open-vocabulary": ("grounding_dino", "sam31", "yolo_world"),

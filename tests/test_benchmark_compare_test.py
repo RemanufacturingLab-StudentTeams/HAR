@@ -13,6 +13,8 @@ class ModelSelectionTest(unittest.TestCase):
     def test_presets(self):
         self.assertEqual(bench.PRESETS["action"],
                          ("actionclip", "internvideo2", "xclip"))
+        self.assertEqual(bench.PRESETS["vlm"],
+                         ("smolvlm2", "internvideo25", "internvideo3"))
         self.assertEqual(bench.PRESETS["detection"],
                          ("grounding_dino", "sam31", "yolo_world"))
 

@@ -1,11 +1,13 @@
 """Gedeelde actieclassificatie op videoclips.
 
 InternVideo2, X-CLIP en ActionCLIP zijn geen objectdetectoren maar
-classificeren een *clip* (meerdere frames) als één actie. Deze module bevat
-alles wat ze gemeen hebben: klassen/prompts uit de config, deterministische
-clip-sampling, videolezen, score-aggregatie en annotatie. Alleen de
-modeladapter (X-CLIP/InternVideo2 hier, ActionCLIP in
-:mod:`duplo.actionclip`) verschilt.
+classificeren een *clip* (meerdere frames) als één actie. De generatieve
+video-VLM's (SmolVLM2, InternVideo2.5 en InternVideo3) doen hetzelfde via een
+JSON-prompt. Deze module bevat alles wat ze gemeen hebben: klassen/prompts uit
+de config, deterministische clip-sampling, videolezen, score-aggregatie en
+annotatie. Alleen de modeladapter (X-CLIP/InternVideo2 hier, ActionCLIP in
+:mod:`duplo.actionclip` en de generatieve VLM's in
+:mod:`duplo.vlm_actions`) verschilt.
 
 De uitvoer is één rij per clip in ``<model>_actions.csv`` met dezelfde
 ``frame``/``klasse``/``confidence``-conventie als de detectiestappen,
@@ -13,13 +15,17 @@ aangevuld met het clipbereik en de top-k scores.
 """
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
-ACTION_MODEL_KINDS = ("xclip", "internvideo2", "actionclip")
+ACTION_MODEL_KINDS = ("xclip", "internvideo2", "actionclip",
+                      "smolvlm2", "internvideo25", "internvideo3")
+VLM_ACTION_KINDS = ("smolvlm2", "internvideo25", "internvideo3")
 
 DEFAULT_ACTION_TEMPLATES = (
     "a video of a person {}",
@@ -39,6 +45,34 @@ _ACTION_MODEL_ALIASES = {
     "actionclip": "actionclip",
     "action-clip": "actionclip",
     "action_clip": "actionclip",
+    "smolvlm2": "smolvlm2",
+    "smol-vlm2": "smolvlm2",
+    "smol_vlm2": "smolvlm2",
+    "smolvlm-2": "smolvlm2",
+    "smol-vlm-2": "smolvlm2",
+    "huggingfacetb/smolvlm2-2.2b-instruct": "smolvlm2",
+    "huggingfacetb/smolvlm2-500m-video-instruct": "smolvlm2",
+    "huggingfacetb/smolvlm2-256m-video-instruct": "smolvlm2",
+    "internvideo25": "internvideo25",
+    "internvideo2.5": "internvideo25",
+    "internvideo2_5": "internvideo25",
+    "internvideo2-5": "internvideo25",
+    "intern-video2.5": "internvideo25",
+    "intern_video2.5": "internvideo25",
+    "intern-video-2.5": "internvideo25",
+    "internvideo-2.5": "internvideo25",
+    "opengvlab/internvideo2_5_chat_8b": "internvideo25",
+    "internvideo3": "internvideo3",
+    "intern-video3": "internvideo3",
+    "intern_video3": "internvideo3",
+    "internvideo-3": "internvideo3",
+    "internvideo3-8b": "internvideo3",
+    "internvideo3-8b-instruct": "internvideo3",
+    "internvideo-3-8b": "internvideo3",
+    "intervideo3": "internvideo3",
+    "intervideo3-8b": "internvideo3",
+    "yanziang/internvideo3-8b-instruct": "internvideo3",
+    "opengvlab/internvideo3-8b-instruct": "internvideo3",
 }
 
 
@@ -233,6 +267,153 @@ def prediction_from_logits(prompt_set: PromptSet,
         label=prompt_set.classes[best],
         confidence=float(probabilities[best]),
         scores=scores,
+    )
+
+
+def build_vlm_prompt(classes: Sequence[str], clip_start_s: float,
+                     clip_end_s: float) -> str:
+    """Prompt voor een generatief VLM: label plus start/end binnen de clip.
+
+    De tijden in het antwoord zijn clip-relatief (0 = begin van de clip);
+    :func:`parse_vlm_action_response` zet ze om naar absolute seconden.
+    """
+    duration = max(0.0, clip_end_s - clip_start_s)
+    options = "\n".join(f"- {label}" for label in classes)
+    return (
+        "You are analyzing a short video clip from a larger video.\n"
+        f"The clip starts at {clip_start_s:.2f} seconds and lasts "
+        f"{duration:.2f} seconds.\n"
+        "Choose exactly one action from this list:\n"
+        f"{options}\n"
+        "Also estimate when the chosen action starts and ends. Give "
+        "start_s and end_s as seconds relative to the START OF THIS CLIP "
+        f"(0 to {duration:.2f}).\n"
+        "Return ONLY valid JSON, without markdown, with exactly these keys: "
+        '{"action": "...", "start_s": 0.0, "end_s": 0.0, '
+        '"confidence": 0.0}. Use null for the times if you cannot determine '
+        "them."
+    )
+
+
+def _json_object(text: str) -> dict | None:
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(text):
+        if char != "{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(text[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            return value
+    return None
+
+
+def _value(record: dict, *names):
+    lowered = {str(key).strip().lower(): value
+               for key, value in record.items()}
+    for name in names:
+        if name in lowered:
+            return lowered[name]
+    return None
+
+
+def _float_value(value) -> float | None:
+    if value is None:
+        return None
+    text = str(value).strip().lower().replace(",", ".")
+    if not text or text in ("none", "null", "nan", "n/a", "n.v.t."):
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _match_class(value, classes: Sequence[str]) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip().casefold()
+    if not text:
+        return None
+    ordered = sorted(classes, key=len, reverse=True)
+    for label in ordered:
+        if text == label.casefold():
+            return label
+    for label in ordered:
+        if label.casefold() in text:
+            return label
+    return None
+
+
+def parse_vlm_action_response(text: str, classes: Sequence[str],
+                              clip_start_s: float,
+                              clip_end_s: float) -> ActionPrediction:
+    """Parse een VLM-antwoord naar label, confidence en absolute tijden.
+
+    De prompt vraagt om clip-relatieve tijden; die worden hier omgezet naar
+    absolute seconden. Valt het model terug op vrije tekst, dan proberen we
+    alsnog een klassenaam en een tijdsbereik te vinden.
+    """
+    duration = max(0.0, clip_end_s - clip_start_s)
+    record = _json_object(text) or {}
+    action_value = _value(record, "action", "label", "klasse", "class")
+    label = _match_class(action_value, classes)
+    if label is None:
+        label = _match_class(text, classes)
+    label = label or "unknown"
+    confidence_value = _value(record, "confidence", "score", "probability")
+    if (isinstance(confidence_value, str)
+            and confidence_value.strip().endswith("%")):
+        try:
+            confidence = float(confidence_value.strip().rstrip("%")) / 100.0
+        except ValueError:
+            confidence = None
+    else:
+        confidence = _float_value(confidence_value)
+    if confidence is None:
+        match = re.search(
+            r"confidence\D{0,20}(\d+(?:\.\d+)?)\s*%?", text,
+            flags=re.IGNORECASE)
+        if match:
+            confidence = float(match.group(1))
+            if "%" in match.group(0):
+                confidence /= 100.0
+    if confidence is not None:
+        if 1.0 < confidence <= 100.0:
+            confidence /= 100.0
+        confidence = max(0.0, min(1.0, confidence))
+
+    start = _float_value(_value(record, "start_s", "start", "start_time",
+                                "start_timestamp"))
+    end = _float_value(_value(record, "end_s", "end", "end_time",
+                              "end_timestamp"))
+    if start is None or end is None:
+        # Voorkeur voor decimalen, zodat een percentage zoals "75%" niet als
+        # starttijd wordt gezien voordat "0.5 to 2.0" aan de beurt is.
+        numbers = re.findall(r"-?\d+\.\d+", text)
+        if len(numbers) < 2:
+            numbers = re.findall(r"-?\d+(?:\.\d+)?", text)
+        if start is None and end is None and len(numbers) >= 2:
+            start, end = float(numbers[0]), float(numbers[1])
+    if start is not None:
+        start = max(0.0, min(duration, start)) + clip_start_s
+    if end is not None:
+        end = max(0.0, min(duration, end)) + clip_start_s
+    if start is not None and end is not None and end < start:
+        start, end = end, start
+    if start is not None and end is not None and end <= start:
+        start = end = None
+
+    scores = ({label: confidence}
+              if label != "unknown" and confidence is not None else {})
+    return ActionPrediction(
+        label=label,
+        confidence=confidence,
+        scores=scores,
+        start_s=start,
+        end_s=end,
+        raw_text=text.strip(),
     )
 
 
@@ -458,19 +639,32 @@ def _patch_transformers_for_remote_code() -> None:
     """Vang kleine API-verschillen op voor oude remote-code-modellen.
 
     InternVideo2's Hugging Face-code is geschreven voor transformers 4.x en
-    gebruikt ``all_tied_weights_keys``; transformers 5 heeft die naam
-    vervangen door ``get_expanded_tied_weights_keys()``. Zonder deze
-    compatibiliteitsproperty stopt ``from_pretrained`` na het laden van de
-    gewichten met een AttributeError.
+    gebruikt ``all_tied_weights_keys``. Transformers 5.19 kent die naam niet
+    als class-attribuut meer, maar zet hem tijdens ``post_init`` op het model.
+    Een property met alleen een getter laat die toewijzing crashen; deze
+    property heeft daarom ook een setter en bewaart de waarde per instantie.
     """
     from transformers import PreTrainedModel
 
-    if not hasattr(PreTrainedModel, "all_tied_weights_keys"):
-        getter = getattr(PreTrainedModel, "get_expanded_tied_weights_keys",
-                         None)
-        PreTrainedModel.all_tied_weights_keys = property(
-            (lambda self: getter(self)) if getter is not None
-            else (lambda self: {}))
+    if hasattr(PreTrainedModel, "all_tied_weights_keys"):
+        return
+    getter = getattr(PreTrainedModel, "get_expanded_tied_weights_keys", None)
+
+    def _get(self):
+        stored = self.__dict__.get("_duplo_all_tied_weights_keys")
+        if stored is not None:
+            return stored
+        if getter is None:
+            return {}
+        try:
+            return getter(self)
+        except Exception:  # noqa: BLE001 - model kan nog niet geinitialiseerd zijn
+            return {}
+
+    def _set(self, value):
+        self.__dict__["_duplo_all_tied_weights_keys"] = value
+
+    PreTrainedModel.all_tied_weights_keys = property(_get, _set)
 
 
 def _install_flash_attn_shim() -> None:
@@ -618,7 +812,7 @@ class InternVideo2Classifier:
 
 def create_action_classifier(cfg: dict, device: str,
                              kind: str | None = None):
-    """Factory voor de drie actiemodellen (lazy imports per model)."""
+    """Factory voor de actiemodellen (lazy imports per model)."""
     kind = normalize_action_model(kind or cfg.get("action_model", "xclip"))
     if kind == "xclip":
         return XClipClassifier(cfg, device)
@@ -628,4 +822,8 @@ def create_action_classifier(cfg: dict, device: str,
         from duplo.actionclip import ActionClipClassifier
 
         return ActionClipClassifier(cfg, device)
+    if kind in VLM_ACTION_KINDS:
+        from duplo.vlm_actions import create_vlm_classifier
+
+        return create_vlm_classifier(cfg, device, kind)
     raise SystemExit(f"Onbekend actiemodel: {kind!r}.")

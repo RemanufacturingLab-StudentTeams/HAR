@@ -9,12 +9,12 @@ Proof of concept voor het automatisch analyseren van DUPLO-disassemblyvideo's. D
 - `Documentation/` – [Opdracht.md](Documentation/Opdracht.md) (opdrachtomschrijving), [PLAN.md](Documentation/PLAN.md) (technisch plan), [Modelvergelijking.md](Documentation/Modelvergelijking.md) (testrapport van de modelvergelijking), [Benchmarking.md](Documentation/Benchmarking.md) (taakbewuste benchmarkmethodiek en temporele evaluatie) en [MediaPipe_annotering.md](Documentation/MediaPipe_annotering.md) (handleiding voor handmatige actieannotatie)
 - `models/` – gedownloade modelgewichten (`yolo26x.pt`, `yolo26x-seg.pt`, `yolov8x-worldv2.pt`, `hand_landmarker.task`, `sam3.1_multiplex.pt` en optioneel `sam3.pt`; niet in git, worden waar nodig automatisch gedownload)
 - `third_party/VITRA/` – optionele clone van de officiële microsoft/VITRA-repo (niet in git; zie de VITRA-sectie)
-- `outputs/` – resultaten per video, per stap een eigen submap (`yolo/`, `handpose/`, `tracking/`, `yolo_world_tracking/`, `grounding_dino_tracking/`, `sam3_tracking/`, `sam31_tracking/`, `rfdetr/`, `rfdetr_seg/`, `grounding_dino/`, `yolo_world/`, `yolo_seg/`, `sam3/`, `sam31/`, `vitra/`, `xclip/`, `internvideo2/`, `actionclip/` en `comparison/`) met CSV's, voorbeeldframes en debug-video; `outputs/benchmarks/` bevat de rapporten van geselecteerde-modelbenchmarks
-- `src/duplo/` – gedeelde componenten: CLI, config, GPU-setup (`gpu.py`, incl. `to_cuda_device`), video-inlezen (`video.py`), output (`output.py`), detectie (`detection.py` met `Detector`-protocol + `create_detector`), ByteTrack-tracking (`tracking.py`), taakbewuste benchmark-samenvattingen (`benchmark.py`), CSV-schema's (`schema.py`), annotatie (`annotate.py`), VITRA-adapter (`vitra.py`, `vitra_state.py` voor HaWoR/MoGe/MANO), actieclassificatie (`actions.py` voor clip-sampling/prompts/X-CLIP/InternVideo2, `actionclip.py` voor ActionCLIP en `action_eval.py` voor temporele metrics) en pipeline-orchestratie (`pipeline.py` met `setup_runtime/run_detection_loop`)
+- `outputs/` – resultaten per video, per stap een eigen submap (`yolo/`, `handpose/`, `tracking/`, `yolo_world_tracking/`, `grounding_dino_tracking/`, `sam3_tracking/`, `sam31_tracking/`, `rfdetr/`, `rfdetr_seg/`, `grounding_dino/`, `yolo_world/`, `yolo_seg/`, `sam3/`, `sam31/`, `vitra/`, `xclip/`, `internvideo2/`, `actionclip/`, `smolvlm2/`, `internvideo25/`, `internvideo3/` en `comparison/`) met CSV's, voorbeeldframes en debug-video; `outputs/benchmarks/` bevat de rapporten van geselecteerde-modelbenchmarks
+- `src/duplo/` – gedeelde componenten: CLI, config, GPU-setup (`gpu.py`, incl. `to_cuda_device`), video-inlezen (`video.py`), output (`output.py`), detectie (`detection.py` met `Detector`-protocol + `create_detector`), ByteTrack-tracking (`tracking.py`), taakbewuste benchmark-samenvattingen (`benchmark.py`), CSV-schema's (`schema.py`), annotatie (`annotate.py`), VITRA-adapter (`vitra.py`, `vitra_state.py` voor HaWoR/MoGe/MANO), actieclassificatie (`actions.py` voor clip-sampling/prompts/X-CLIP/InternVideo2, `actionclip.py` voor ActionCLIP, `vlm_actions.py` voor SmolVLM2/InternVideo2.5/InternVideo3 en `action_eval.py` voor temporele metrics) en pipeline-orchestratie (`pipeline.py` met `setup_runtime/run_detection_loop`)
 - `src/run_yolo_video.py` – YOLO-pipeline (detectie, in dit project gericht op gereedschappen)
 - `src/run_handpose.py` – MediaPipe-pipeline (handlandmarks, met `handpose_summary.json` voor timing)
 - `src/run_vitra_test.py` – VITRA-pipeline (zero-shot handactie-voorspelling, met optionele HaWoR + MoGe + MANO-statepass)
-- `src/run_action_test.py` – actieclassificatie-pipeline voor InternVideo2, X-CLIP en ActionCLIP (`--model`)
+- `src/run_action_test.py` – actieclassificatie-pipeline voor X-CLIP, InternVideo2, ActionCLIP en de generatieve VLM's (`--model`)
 - `src/run_tracking.py` – YOLO + ByteTrack-pipeline (objecten volgen over frames, met `tracking_summary.json`)
 - `src/run_yolo_world_tracking.py` / `src/run_grounding_dino_tracking.py` / `src/run_sam3_tracking.py` / `src/run_sam31_tracking.py` – open-vocabulary detector + ByteTrack (zelfde tracking-CSV als `run_tracking.py`)
 - `src/run_rfdetr_video.py` – RF-DETR-detectie (COCO-gewichten)
@@ -28,7 +28,7 @@ Proof of concept voor het automatisch analyseren van DUPLO-disassemblyvideo's. D
 - `src/benchmark_compare.py` – benchmark geselecteerde modellen op één video of één model over meerdere video's, met automatische gemiddelden en rapporten
 - `requirements.txt` / `requirements-vitra.txt` – hoofd- en geïsoleerde VITRA-runtime-dependencies
 - `run_common.bat` – gedeelde venv + pip fast-check (hash van `requirements.txt`; `pip install` wordt overgeslagen bij ongewijzigde hash; forceer met `--upgrade`)
-- `run_yolo_test.bat` / `run_handpose_test.bat` / `run_tracking_test.bat` / `run_rfdetr_test.bat` / `run_rfdetr_seg_test.bat` / `run_grounding_dino_test.bat` / `run_yolo_world_test.bat` / `run_yolo_seg_test.bat` / `run_sam3_test.bat` / `run_sam31_test.bat` / `run_sam31_tracking_test.bat` / `run_vitra_test.bat` / `run_xclip_test.bat` / `run_internvideo2_test.bat` / `run_actionclip_test.bat` / `run_compare_models.bat` / `run_benchmark.bat` / `run_benchmark_suite.bat` / `run_benchmark_compare.bat` / `run_unit_tests.bat` – dunne startscripts voor Windows (roepen `run_common.bat` aan)
+- `run_yolo_test.bat` / `run_handpose_test.bat` / `run_tracking_test.bat` / `run_rfdetr_test.bat` / `run_rfdetr_seg_test.bat` / `run_grounding_dino_test.bat` / `run_yolo_world_test.bat` / `run_yolo_seg_test.bat` / `run_sam3_test.bat` / `run_sam31_test.bat` / `run_sam31_tracking_test.bat` / `run_vitra_test.bat` / `run_xclip_test.bat` / `run_internvideo2_test.bat` / `run_actionclip_test.bat` / `run_smolvlm2_test.bat` / `run_internvideo25_test.bat` / `run_internvideo3_test.bat` / `run_compare_models.bat` / `run_benchmark.bat` / `run_benchmark_suite.bat` / `run_benchmark_compare.bat` / `run_unit_tests.bat` – dunne startscripts voor Windows (roepen `run_common.bat` aan)
 
 SAM 3.1 gebruikt in `configs/baseline.yaml` een eigen `sam31_tracking`-blok:
 de lage `detection_conf`-drempel levert kandidaten voor ByteTrack, terwijl
@@ -69,7 +69,7 @@ Voor de toolrecognition zijn naast YOLO zeven alternatieven toegevoegd met dezel
 | `run_sam3_test.bat` | SAM3 | segmentatie, open-vocabulary | `sam3/` |
 | `run_sam31_test.bat` | SAM 3.1 (Object Multiplex-checkpoint) | segmentatie, open-vocabulary | `sam31/` |
 
-De doelgereedschappen staan als `tool_classes` in `configs/baseline.yaml` (schroevendraaier, steeksleutel, tang, snijder, hamer). De open-vocabulary modellen krijgen die lijst als tekstprompt; de andere modellen gebruiken hun eigen COCO-klassen en kunnen dus alleen gereedschappen vinden die in COCO zitten. De segmentatiestappen loggen ook `mask_area` (maskeroppervlak in pixels). VITRA en de actieclassifiers (InternVideo2, X-CLIP en ActionCLIP) zijn geen detectiemodellen en doen daarom niet mee in deze detectie-score. VITRA staat apart in [VITRA: zero-shot handactie-voorspelling](#vitra-zero-shot-handactie-voorspelling); de classifiers staan in [Actieclassificatie](#actieclassificatie-internvideo2-x-clip-en-actionclip).
+De doelgereedschappen staan als `tool_classes` in `configs/baseline.yaml` (schroevendraaier, steeksleutel, tang, snijder, hamer). De open-vocabulary modellen krijgen die lijst als tekstprompt; de andere modellen gebruiken hun eigen COCO-klassen en kunnen dus alleen gereedschappen vinden die in COCO zitten. De segmentatiestappen loggen ook `mask_area` (maskeroppervlak in pixels). VITRA en de actieclassifiers (X-CLIP, InternVideo2, ActionCLIP, SmolVLM2, InternVideo2.5 en InternVideo3) zijn geen detectiemodellen en doen daarom niet mee in deze detectie-score. VITRA staat apart in [VITRA: zero-shot handactie-voorspelling](#vitra-zero-shot-handactie-voorspelling); de classifiers staan in [Actieclassificatie](#actieclassificatie-x-clip-internvideo2-actionclip-en-generatieve-video-vlms).
 
 Alle detectiestappen gebruiken hetzelfde schema (`video`, `frame`, `timestamp`, `klasse`, `confidence`, `bbox_x`, `bbox_y`, `bbox_w`, `bbox_h`; centraal vastgelegd in `src/duplo/schema.py`), bij segmentatie aangevuld met `mask_area` als pixel-count op frame-resolutie (YOLO-seg via gerasteriseerd polygoon, RF-DETR-seg/SAM via geresized masker — alleen onderling vergelijkbaar binnen segmentatie). Tracking gebruikt `tracking_history.csv` (`frame_number`, `track_id`, `class_name`, `bbox_x1/y1/x2/y2`, `center`, `velocity`, `track_age`, `frames_since_detection`, `status`; zie `src/duplo/tracking.py:CSV_COLUMNS`), handpose `hand_landmarks.csv` (`video`, `frame`, `hand`, `landmark`, `x/y/z`). `compare_models.py` normaliseert `frame/frame_number` en `klasse/class_name`, zodat oude en nieuwe CSV's beide lezen.
 
@@ -117,6 +117,9 @@ Let op de kanttekeningen in het rapport: voor objectdetectie is er geen geannote
 rem Drie actiemodellen op één video
 run_benchmark_compare.bat --preset action --video data\Disassembly1.mp4
 
+rem De generatieve video-VLM's op één video
+run_benchmark_compare.bat --preset vlm --video data\Disassembly1.mp4
+
 rem Grounding DINO vs SAM 3.1 vs YOLO-World op één video
 run_benchmark_compare.bat --preset detection --video data\Disassembly1.mp4
 
@@ -127,7 +130,7 @@ rem Eigen selectie, eventueel met een glob
 run_benchmark_compare.bat --models xclip,internvideo2,actionclip --videos "data\*.mp4"
 ```
 
-Beschikbare presets: `action` (ActionCLIP, InternVideo2, X-CLIP), `detection`/`open_vocabulary` (Grounding DINO, SAM 3.1, YOLO-World) en `tracking`. Gebruik `--list-models` of `--list-presets` voor de volledige lijst. Met `--reuse` worden bestaande model-CSV's hergebruikt; standaard worden debug-video's en voorbeeldframes uitgeschakeld voor een schonere benchmark (`--save-videos` zet ze aan).
+Beschikbare presets: `action` (ActionCLIP, InternVideo2, X-CLIP), `vlm`/`generative` (SmolVLM2, InternVideo2.5, InternVideo3), `detection`/`open_vocabulary` (Grounding DINO, SAM 3.1, YOLO-World) en `tracking`. Gebruik `--list-models` of `--list-presets` voor de volledige lijst. Met `--reuse` worden bestaande model-CSV's hergebruikt; standaard worden debug-video's en voorbeeldframes uitgeschakeld voor een schonere benchmark (`--save-videos` zet ze aan).
 
 Resultaten komen in `outputs/benchmarks/<naam>/`:
 
@@ -253,7 +256,7 @@ De VITRA-rijbouw, state-parsing, padding en checkpoint-remapping zijn los te tes
 .venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-## Actieclassificatie: InternVideo2, X-CLIP en ActionCLIP
+## Actieclassificatie: X-CLIP, InternVideo2, ActionCLIP en generatieve video-VLM's
 
 Actieclassifiers kijken niet naar losse objecten, maar classificeren een clip van meerdere frames als één actie uit `action_classes`. Alle modellen gebruiken dezelfde clipindeling en hetzelfde CSV-schema, zodat ze onderling vergelijkbaar zijn:
 
@@ -262,15 +265,35 @@ Actieclassifiers kijken niet naar losse objecten, maar classificeren een clip va
 | `run_xclip_test.bat` | X-CLIP (`microsoft/xclip-base-patch16-zero-shot`) | zero-shot video-text classifier | `xclip/` |
 | `run_internvideo2_test.bat` | InternVideo2-CLIP-S (`OpenGVLab/InternVideo2_CLIP_S`) | zero-shot video-text classifier | `internvideo2/` |
 | `run_actionclip_test.bat` | ActionCLIP ViT-B/32 (MMAction2-port) | Kinetics-getrainde clip-classifier | `actionclip/` |
+| `run_smolvlm2_test.bat` | SmolVLM2 (`HuggingFaceTB/SmolVLM2-2.2B-Instruct`) | generatieve video-VLM met JSON-prompt | `smolvlm2/` |
+| `run_internvideo25_test.bat` | InternVideo2.5-Chat-8B (`OpenGVLab/InternVideo2_5_Chat_8B`) | generatieve video-VLM met JSON-prompt | `internvideo25/` |
+| `run_internvideo3_test.bat` | InternVideo3-8B-Instruct (`yanziang/InternVideo3-8B-Instruct`) | generatieve video-VLM met JSON-prompt | `internvideo3/` |
 
 ```bat
 run_xclip_test.bat
 run_internvideo2_test.bat
 run_actionclip_test.bat
+run_smolvlm2_test.bat
+run_internvideo25_test.bat
+run_internvideo3_test.bat
 run_xclip_test.bat --device cpu
 ```
 
-De modellen downloaden hun gewichten bij de eerste run automatisch (X-CLIP/InternVideo2 naar de Hugging Face-cache, ActionCLIP naar `models/`). InternVideo2 gebruikt `trust_remote_code`; de adapter voorziet een no-op `flash_attn`-shim en een compatibiliteitspatch voor transformers 5. Voor ActionCLIP zijn `clip` en het MMAction2-checkpoint nodig; een eigen lokaal bestand of URL kan via `actionclip_checkpoint`.
+De modellen downloaden hun gewichten bij de eerste run automatisch naar de Hugging Face-cache (ActionCLIP naar `models/`). InternVideo2, InternVideo2.5 en InternVideo3 gebruiken `trust_remote_code`; de adapters voorzien compatibiliteitspatches voor transformers 5. InternVideo2 krijgt daarnaast een no-op `flash_attn`-shim; de 8B-modellen werken zonder flash-attn (eager attention), maar gebruiken die automatisch als hij beschikbaar is. Op Windows kun je een voorgebouwde FlashAttention-2-wheel installeren via [ussoewwin/Flash-Attention-2_for_Windows](https://huggingface.co/ussoewwin/Flash-Attention-2_for_Windows/tree/main), bijvoorbeeld voor Python 3.13, torch 2.14 en een Blackwell-GPU: `flash_attn-2.9.2.post2+cu132torch2.14.0cxx11abiTRUE.blackwell-cp313-cp313-win_amd64.whl` (installeer met `pip install --no-deps <wheel>`). InternVideo2.5 draait vanwege zijn oude remote code in de gedeelde transformers 4.47-runtime (`third_party/vitra_runtime`, dezelfde als VITRA); onder transformers 5 laadt het model wel, maar degenereren de outputlogits. Het tokenizer.model van InternVideo2.5 bevat bovendien een NUL-piece die sentencepiece 0.2 weigert; de adapter maakt daarvoor eenmalig een gesanereerde kopie in `models/internvideo25_tokenizer/`. Voor ActionCLIP zijn `clip` en het MMAction2-checkpoint nodig; een eigen lokaal bestand of URL kan via `actionclip_checkpoint`.
+
+De generatieve VLM's zijn algemene video-language-modellen, geen gespecialiseerde temporele actieclassifiers. Ze krijgen dezelfde clipframes plus een strak JSON-prompt voor het actielabel en de begin-/eindtijd. Hun confidence is niet gekalibreerd en daarom niet direct met de CLIP-achtige classifiers te vergelijken. SmolVLM2 2.2B past in ongeveer 5 GB VRAM; InternVideo2.5 en InternVideo3 zijn 8B-modellen (~16-18 GB in bf16) en werken het best op een GPU. Op CPU werken ze wel, maar is de inferentie zeer traag.
+
+Bronnen: [SmolVLM2-blog](https://huggingface.co/blog/smolvlm2), [InternVideo2.5-Chat-8B](https://huggingface.co/OpenGVLab/InternVideo2_5_Chat_8B) en [InternVideo3-8B-Instruct](https://huggingface.co/yanziang/InternVideo3-8B-Instruct).
+
+### Optionele FlashAttention-2 op Windows
+
+FlashAttention-2 is niet verplicht, maar versnelt de generatieve VLM's op CUDA. Voor Windows zijn voorgebouwde wheels beschikbaar via [ussoewwin/Flash-Attention-2_for_Windows](https://huggingface.co/ussoewwin/Flash-Attention-2_for_Windows/tree/main). Kies de wheel die past bij je Python-, torch-, CUDA- en GPU-architectuur; voor Python 3.13, torch 2.14 en een RTX 50xx (Blackwell) is dit de geteste combinatie:
+
+```bat
+.venv\Scripts\python.exe -m pip install --no-deps "C:\pad\naar\flash_attn-2.9.2.post2+cu132torch2.14.0cxx11abiTRUE.blackwell-cp313-cp313-win_amd64.whl"
+```
+
+De adapters detecteren flash-attn automatisch en gebruiken hem voor SmolVLM2 en InternVideo2.5; zonder flash-attn vallen ze terug op eager attention. Met `internvideo25_attn_implementation: "auto"` (standaard) of `"eager"` kun je dit per model forceren. De wheel is een niet-officiële build: test hem eerst met een korte run.
 
 De resultaten komen per model in `outputs/Disassembly1/<model>/`:
 
@@ -288,16 +311,20 @@ De actie-opties staan bij elkaar in `configs/baseline.yaml`:
 | `action_prompts` | Optioneel: eigen prompt of lijst prompts per klasse (heeft voorrang). |
 | `action_frames` / `action_span` / `action_stride` | Fallback voor frames per clip, venster in videoframes en stap tussen clipstarts; het checkpoint bepaalt het echte aantal frames. |
 | `action_top_k` | Aantal scores in `top_k` en de overlay. |
-| `action_model` | Standaardmodel als `--model` ontbreekt (`xclip`, `internvideo2` of `actionclip`). |
+| `action_model` | Standaardmodel als `--model` ontbreekt (`xclip`, `internvideo2`, `actionclip`, `smolvlm2`, `internvideo25` of `internvideo3`). |
 | `xclip_model` / `internvideo2_model` | Hugging Face-repo-id of lokaal pad. |
 | `internvideo2_trust_remote_code` / `internvideo2_revision` | Remote-code toestaan (standaard `true`) en optioneel een vaste HF-revisie. |
 | `actionclip_model` | `ViT-B/32-8`, `ViT-B/16-8`, `ViT-B/16-16` of `ViT-B/16-32`. |
 | `actionclip_checkpoint` | Optioneel lokaal checkpoint of URL; leeg = automatisch downloaden. |
+| `smolvlm2_model` / `internvideo25_model` / `internvideo3_model` | Hugging Face-repo-id of lokaal pad voor de generatieve VLM's. |
+| `vlm_frames` / `vlm_clip_span` / `vlm_clip_stride` | Frames per clip en venster/stap voor de generatieve VLM's (standaard 8 frames, ~3 s context). |
+| `vlm_max_new_tokens` / `vlm_dtype` | Maximale JSON-antwoordlengte en modeldtype (`auto` = bf16 op GPU, fp32 op CPU). |
+| `internvideo25_max_num` / `internvideo25_tokenizer_dir` / `internvideo25_runtime_path` / `internvideo25_attn_implementation` / `internvideo3_max_pixels` | InternVL-tiles per frame, lokale gesanereerde tokenizer, gedeelde transformers 4.47-runtime, attention-backend (`auto` = flash-attn indien beschikbaar) en pixelbudget per frame voor InternVideo3. |
 | `action_ground_truth` | Optioneel CSV/JSON met `video,action,start_s,end_s` voor accuracy en temporele IoU. |
-| `save_xclip_video` / `save_internvideo2_video` / `save_actionclip_video` | Debug-video per model aan/uit. |
+| `save_xclip_video` / `save_internvideo2_video` / `save_actionclip_video` / `save_smolvlm2_video` / `save_internvideo25_video` / `save_internvideo3_video` | Debug-video per model aan/uit. |
 | `action_debug_repeat_frames` | Herhaal elk clipframe tot de bronfps (anders ~1 fps video). |
 
-Het checkpoint bepaalt het aantal frames per clip: de standaard X-CLIP gebruikt 32 frames, InternVideo2 8 en ActionCLIP 8 (voor de B/16-varianten zijn 16/32-frame checkpoints beschikbaar). Voor een snellere X-CLIP-test kun je `xclip_model` op een 8- of 16-frame checkpoint zetten, bijvoorbeeld `microsoft/xclip-base-patch32`.
+Het checkpoint bepaalt het aantal frames per clip: de standaard X-CLIP gebruikt 32 frames, InternVideo2 8 en ActionCLIP 8 (voor de B/16-varianten zijn 16/32-frame checkpoints beschikbaar). Voor de generatieve VLM's geldt `vlm_frames` (standaard 8). Voor een snellere X-CLIP-test kun je `xclip_model` op een 8- of 16-frame checkpoint zetten, bijvoorbeeld `microsoft/xclip-base-patch32`.
 
 ### Classificatie en temporele nauwkeurigheid apart meten
 

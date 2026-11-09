@@ -11,7 +11,7 @@ detectiescore worden beoordeeld.
 | `object_detection` | YOLO, RF-DETR, Grounding DINO, YOLO-World, YOLO-seg, RF-DETR-seg, SAM3, SAM 3.1, ByteTrack-varianten | `*_detections.csv` / `*_tracking_history.csv` | tooldekking, tool-frames, confidence, fps |
 | `hand_detection` | MediaPipe Hands | `hand_landmarks.csv` | frames met handen, landmarkrijen, fps |
 | `3d_hand_prediction` | VITRA | `vitra_actions.csv` | frames, actierijen, handen, chunk, fps |
-| `action_classification` | X-CLIP, InternVideo2, ActionCLIP | `*_actions.csv` | clips, labels, confidence, classificatie-accuracy, temporele IoU |
+| `action_classification` | X-CLIP, InternVideo2, ActionCLIP, SmolVLM2, InternVideo2.5, InternVideo3 | `*_actions.csv` | clips, labels, confidence, classificatie-accuracy, temporele IoU |
 
 Elke run schrijft daarnaast `<model>_summary.json`. Sinds benchmarkversie 2
 bevat die samenvatting:
@@ -51,11 +51,13 @@ de modellen en video's kiest:
 
 ```bat
 run_benchmark_compare.bat --preset action --video data\Disassembly1.mp4
+run_benchmark_compare.bat --preset vlm --video data\Disassembly1.mp4
 run_benchmark_compare.bat --preset detection --video data\Disassembly1.mp4
 run_benchmark_compare.bat --model xclip --videos data\v1.mp4 data\v2.mp4
 ```
 
 - `--preset action` = ActionCLIP vs InternVideo2 vs X-CLIP.
+- `--preset vlm`/`generative` = SmolVLM2 vs InternVideo2.5 vs InternVideo3.
 - `--preset detection` = Grounding DINO vs SAM 3.1 vs YOLO-World.
 - `--model MODEL --videos ...` draait één model op meerdere video's en
   berekent het gemiddelde per numerieke metric.
@@ -73,9 +75,10 @@ geslaagde runs; mislukte runs staan expliciet in het rapport en in
 ## 4. Actieclassificatie en temporele localisatie
 
 Gespecialiseerde classifiers (X-CLIP, InternVideo2, ActionCLIP) geven alleen
-een label per clip. `action_ground_truth` voegt classificatie-accuracy toe;
-modellen die later ook begin- en eindtijden leveren, kunnen dezelfde
-temporele metrics gebruiken.
+een label per clip. De generatieve VLM's (SmolVLM2, InternVideo2.5,
+InternVideo3) krijgen een JSON-prompt en kunnen daarnaast begin- en eindtijden
+voorspellen. `action_ground_truth` voegt classificatie-accuracy en temporele
+metrics toe voor beide groepen.
 
 ### Ground truth
 
@@ -121,6 +124,10 @@ temporal-action-localizer.
 ## 5. Reproduceerbaarheid
 
 - Gebruik dezelfde video, `frame_stride`, clipinstellingen en prompts.
+- InternVideo2.5 draait in de gedeelde transformers 4.47-runtime
+  (`third_party/vitra_runtime`) omdat de remote code onder transformers 5
+  degenererende output geeft; de benchmark start die run automatisch in een
+  subprocess.
 - De eerste inferentie kan trager zijn door modeldownload/cache; meet bij
   voorkeur een tweede run.
 - `environment` in de summary legt hardware en software vast.

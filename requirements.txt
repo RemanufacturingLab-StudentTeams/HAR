@@ -17,12 +17,20 @@ transformers==5.19.0
 timm==1.0.30
 supervision==0.30.9
 # Actieclassificatie: X-CLIP (transformers), InternVideo2 (timm/einops/
-# open_clip) en ActionCLIP (gebruikt het bestaande 'clip'-pakket hieronder).
+# open_clip), ActionCLIP (gebruikt het bestaande 'clip'-pakket hieronder) en
+# de generatieve video-VLM's SmolVLM2/InternVideo2.5/InternVideo3.
 # InternVideo2's remote code importeert flash_attn onvoorwaardelijk; de
 # adapter voorziet een no-op shim omdat de configuratie gewone attention
 # gebruikt, zodat flash-attn niet op elke laptop geinstalleerd hoeft te worden.
 einops==0.8.2
 open_clip_torch==4.2.1
+# SmolVLM2's processor gebruikt num2words voor de frametimestamps in de
+# videoprompt. De 8B InternVideo-modellen draaien met dezelfde transformers-
+# en torch/torchvision-versie; flash-attn is niet nodig (eager attention).
+# protobuf is nodig om InternVideo2.5's SentencePiece-model te saneren: het
+# originele tokenizer.model bevat een NUL-piece die sentencepiece 0.2 weigert.
+num2words==0.5.14
+protobuf==6.33.1
 # SAM3: gewichten van facebook/sam3 vereisen een goedgekeurde Hugging
 # Face-toegangsaanvraag + 'hf auth login'; sam3 verlaagt numpy naar <2.4 en op
 # Windows is triton-windows nodig (sam3 importeert triton).

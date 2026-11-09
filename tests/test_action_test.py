@@ -14,12 +14,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from duplo.actions import (
     ActionPrediction,
     PromptSet,
+    VLM_ACTION_KINDS,
     VideoClipReader,
     annotate_action,
     build_prompt_set,
+    build_vlm_prompt,
     clip_windows,
     normalize_action_model,
     parse_action_classes,
+    parse_vlm_action_response,
     prediction_from_logits,
     softmax,
 )
@@ -116,6 +119,54 @@ class ActionPromptTest(unittest.TestCase):
             prediction_from_logits(prompt_set, [1.0])
 
 
+class VlmActionPromptTest(unittest.TestCase):
+    def test_prompt_contains_classes_and_relative_times(self):
+        prompt = build_vlm_prompt(["unscrew", "idle"], 12.5, 15.5)
+        self.assertIn("- unscrew", prompt)
+        self.assertIn("- idle", prompt)
+        self.assertIn("0 to 3.00", prompt)
+        self.assertIn('"action"', prompt)
+
+    def test_parse_json_with_relative_times(self):
+        prediction = parse_vlm_action_response(
+            '{"action": "unscrew", "start_s": 0.25, "end_s": 2.5, '
+            '"confidence": 0.8}',
+            ["unscrew", "idle"], 10.0, 13.0)
+        self.assertEqual(prediction.label, "unscrew")
+        self.assertAlmostEqual(prediction.confidence, 0.8)
+        self.assertAlmostEqual(prediction.start_s, 10.25)
+        self.assertAlmostEqual(prediction.end_s, 12.5)
+        self.assertEqual(prediction.scores, {"unscrew": 0.8})
+        self.assertIn("unscrew", prediction.raw_text)
+
+    def test_parse_free_text_and_percentage_confidence(self):
+        prediction = parse_vlm_action_response(
+            "The action is idle. Confidence: 75%. Times: 0.5 to 2.0",
+            ["unscrew", "idle"], 30.0, 33.0)
+        self.assertEqual(prediction.label, "idle")
+        self.assertAlmostEqual(prediction.confidence, 0.75)
+        self.assertAlmostEqual(prediction.start_s, 30.5)
+        self.assertAlmostEqual(prediction.end_s, 32.0)
+
+    def test_parse_unknown_and_invalid_times(self):
+        prediction = parse_vlm_action_response(
+            '{"action": "dancing", "start_s": 4.0, "end_s": 1.0}',
+            ["unscrew", "idle"], 5.0, 8.0)
+        self.assertEqual(prediction.label, "unknown")
+        self.assertIsNone(prediction.confidence)
+        self.assertAlmostEqual(prediction.start_s, 6.0)
+        self.assertAlmostEqual(prediction.end_s, 8.0)
+        self.assertEqual(prediction.scores, {})
+
+    def test_video_metadata_covers_clip_duration(self):
+        from duplo.vlm_actions import _video_metadata
+
+        metadata = _video_metadata([object()] * 8, 10.0, 13.0)
+        self.assertEqual(metadata.total_num_frames, 8)
+        self.assertAlmostEqual(metadata.timestamps[0], 0.0)
+        self.assertAlmostEqual(metadata.timestamps[-1], 3.0, places=6)
+
+
 class ClipWindowTest(unittest.TestCase):
     def test_windows_cover_video_end(self):
         windows = clip_windows(total_frames=100, clip_frames=8,
@@ -191,6 +242,17 @@ class ActionModelSelectionTest(unittest.TestCase):
         self.assertEqual(normalize_action_model("intern_video2"),
                          "internvideo2")
         self.assertEqual(normalize_action_model("ActionCLIP"), "actionclip")
+        self.assertEqual(normalize_action_model("SmolVLM2"), "smolvlm2")
+        self.assertEqual(normalize_action_model("InternVideo2.5"),
+                         "internvideo25")
+        self.assertEqual(normalize_action_model("internvideo3-8B"),
+                         "internvideo3")
+        self.assertEqual(normalize_action_model("intervideo3-8b"),
+                         "internvideo3")
+
+    def test_generative_kinds_are_registered(self):
+        self.assertEqual(VLM_ACTION_KINDS,
+                         ("smolvlm2", "internvideo25", "internvideo3"))
 
     def test_unknown_model(self):
         with self.assertRaises(SystemExit):
@@ -201,6 +263,17 @@ class ActionModelSelectionTest(unittest.TestCase):
 
         with self.assertRaises(SystemExit):
             create_action_classifier({}, "cpu", "slowfast")
+
+    def test_vlm_factory_dispatches_without_loading_model(self):
+        from duplo.actions import create_action_classifier
+
+        with mock.patch(
+                "duplo.vlm_actions.create_vlm_classifier",
+                return_value="fake-vlm") as create:
+            classifier = create_action_classifier({}, "cpu", "internvideo3")
+        self.assertEqual(classifier, "fake-vlm")
+        create.assert_called_once()
+        self.assertEqual(create.call_args.args[2], "internvideo3")
 
 
 class ActionClipPreprocessingTest(unittest.TestCase):
@@ -289,6 +362,52 @@ class RemoteCodeCompatibilityTest(unittest.TestCase):
 
         _patch_transformers_for_remote_code()
         self.assertTrue(hasattr(PreTrainedModel, "all_tied_weights_keys"))
+
+        class DummyModel(PreTrainedModel):
+            pass
+
+        model = DummyModel.__new__(DummyModel)
+        model.all_tied_weights_keys = {"target": "source"}
+        self.assertEqual(model.all_tied_weights_keys,
+                         {"target": "source"})
+
+
+class InternVideo25RuntimeIsolationTest(unittest.TestCase):
+    def test_child_process_is_not_relaunched(self):
+        import run_action_test
+
+        with mock.patch.dict(
+                "os.environ",
+                {run_action_test.INTERNVIDEO25_ISOLATED_ENV: "1"}):
+            run_action_test.ensure_internvideo25_runtime({})
+
+    def test_missing_runtime_explains_install(self):
+        import run_action_test
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(run_action_test, "_transformers_major",
+                                   return_value=5):
+                with self.assertRaises(SystemExit):
+                    run_action_test.ensure_internvideo25_runtime({
+                        "internvideo25_runtime_path": tmp})
+
+    def test_present_runtime_relaunches_with_pythonpath(self):
+        import run_action_test
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = Path(tmp)
+            (runtime / "transformers").mkdir()
+            (runtime / "transformers" / "__init__.py").write_text("")
+            with mock.patch.object(run_action_test, "_transformers_major",
+                                   return_value=5), \
+                    mock.patch.object(run_action_test.subprocess, "call",
+                                      return_value=0) as call:
+                with self.assertRaises(SystemExit):
+                    run_action_test.ensure_internvideo25_runtime({
+                        "internvideo25_runtime_path": tmp})
+            env = call.call_args.kwargs["env"]
+        self.assertIn(str(runtime.resolve()), env["PYTHONPATH"])
+        self.assertEqual(env[run_action_test.INTERNVIDEO25_ISOLATED_ENV], "1")
 
 
 class ActionPipelineTest(unittest.TestCase):

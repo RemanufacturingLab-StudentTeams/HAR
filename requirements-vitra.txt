@@ -6,11 +6,15 @@
 # VITRA-stap in een subprocess met deze pins op de PYTHONPATH; de hoofd-venv
 # blijft op transformers 5.x voor SAM3.
 #
+# Dezelfde runtime wordt gebruikt voor InternVideo2.5: de remote code daarvan
+# laadt onder transformers 5 wel, maar de outputlogits degenereren.
+#
 # Installeren (eenmalig, vanuit de projectmap):
 #   .venv\Scripts\python.exe -m pip install --no-deps --target third_party\vitra_runtime -r requirements-vitra.txt
 #
-# run_vitra_test.bat doet dit automatisch als third_party\vitra_runtime nog
-# niet bestaat. De map staat in .gitignore via third_party/.
+# run_vitra_test.bat en run_internvideo25_test.bat doen dit automatisch als
+# third_party\vitra_runtime nog niet bestaat. De map staat in .gitignore via
+# third_party/.
 transformers==4.47.1
 tokenizers==0.21.0
 huggingface-hub==0.34.2
