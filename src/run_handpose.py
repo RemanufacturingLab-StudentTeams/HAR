@@ -9,14 +9,13 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-from duplo.benchmark import InferenceTimer, write_run_summary
+from duplo.benchmark import TASK_HAND_DETECTION, InferenceTimer, write_run_summary
 from duplo.cli import parse_args
-from duplo.config import load_config, resolve_device
+from duplo.config import load_config, resolve_device, resolve_video_path
 from duplo.output import prepare_output_dir, save_screenshot, write_rows_csv
 from duplo.schema import HANDPOSE_COLUMNS
 from duplo.video import VideoFrames, video_fps
 from duplo.video_writer import DebugVideoWriter
-
 
 MODEL_URL = (
     "https://storage.googleapis.com/mediapipe-models/hand_landmarker/"
@@ -91,6 +90,7 @@ def create_landmarker(cfg: dict, model_path: Path, delegate) -> vision.HandLandm
 
 def main(cfg_path: str, device: str | None = None) -> None:
     cfg = load_config(cfg_path)
+    resolve_video_path(cfg)
     out_dir = prepare_output_dir(cfg, "handpose")
 
     device = resolve_device(device, cfg)
@@ -166,6 +166,7 @@ def main(cfg_path: str, device: str | None = None) -> None:
         frames_processed=len(timer.times_ms),
         elapsed_s=time.perf_counter() - started, rows=[], timer=timer,
         csv_file="hand_landmarks.csv", class_field="hand",
+        task=TASK_HAND_DETECTION,
         extra={"conf_threshold": cfg.get("conf_threshold"),
                "frame_stride": stride,
                "landmark_rows": len(rows)})

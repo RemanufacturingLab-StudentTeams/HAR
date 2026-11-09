@@ -8,12 +8,12 @@ hier niet gebruikt.
 """
 import time
 
-from duplo.benchmark import InferenceTimer, write_run_summary
+from duplo.benchmark import TASK_OBJECT_DETECTION, InferenceTimer, write_run_summary
 from duplo.cli import parse_args
 from duplo.detection import Sam3Detector
 from duplo.output import write_rows_csv
 from duplo.pipeline import load_step_config, setup_runtime
-from duplo.tracking import (CSV_COLUMNS, ObjectTracker, build_row, draw_tracks)
+from duplo.tracking import CSV_COLUMNS, ObjectTracker, build_row, draw_tracks
 from duplo.video import VideoFrames, video_fps
 from duplo.video_writer import DebugVideoWriter
 
@@ -63,6 +63,7 @@ def main(cfg_path: str, device: str | None = None) -> None:
         frames_processed=len(timer.times_ms),
         elapsed_s=time.perf_counter() - started, rows=rows, timer=timer,
         csv_file="sam3_tracking_history.csv", class_field="class_name",
+        task=TASK_OBJECT_DETECTION, subtask="tracking",
         extra={"conf_threshold": cfg["conf_threshold"], "frame_stride": stride,
                "tekstprompt": detector.prompts, "track_low_thresh": low_conf})
     track_ids = {row["track_id"] for row in rows}

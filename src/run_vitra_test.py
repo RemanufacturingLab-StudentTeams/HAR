@@ -26,17 +26,25 @@ from pathlib import Path
 
 import numpy as np
 
-from duplo.benchmark import InferenceTimer
+from duplo.benchmark import TASK_3D_HAND_PREDICTION, InferenceTimer
 from duplo.cli import parse_args
 from duplo.output import save_screenshot
-from duplo.pipeline import (finish_detection_run, load_step_config,
-                            open_debug_writer, setup_runtime,
-                            should_screenshot, video_params)
+from duplo.pipeline import (
+    finish_detection_run,
+    load_step_config,
+    open_debug_writer,
+    setup_runtime,
+    should_screenshot,
+    video_params,
+)
 from duplo.schema import VITRA_COLUMNS, vitra_action_rows
 from duplo.video import VideoFrames
 from duplo.vitra import STATE_DIM, VitraPredictor, annotate_vitra
-from duplo.vitra_state import (FRAME_STATES_FILE, load_frame_states,
-                               reconstruct_video_states)
+from duplo.vitra_state import (
+    FRAME_STATES_FILE,
+    load_frame_states,
+    reconstruct_video_states,
+)
 
 DEFAULT_RUNTIME_DIR = "third_party/vitra_runtime"
 ISOLATED_ENV = "DUPLO_VITRA_ISOLATED"
@@ -177,7 +185,8 @@ def main(cfg_path: str, device: str | None = None) -> None:
         out_dir, out_dir.name, model=predictor.model_id, device=device,
         video_path=cfg["video_path"], frames=frames, started=started,
         rows=rows, timer=timer, csv_file="vitra_actions.csv",
-        columns=VITRA_COLUMNS, class_field="hand", extra=extra)
+        columns=VITRA_COLUMNS, class_field="hand",
+        task=TASK_3D_HAND_PREDICTION, extra=extra)
 
 
 if __name__ == "__main__":

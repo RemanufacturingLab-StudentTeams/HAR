@@ -3,6 +3,8 @@
 *Uitgevoerd op 14 oktober 2026 op `data/Disassembly1.mp4` met de pipelines in `src/` en de instellingen uit `configs/baseline.yaml`. Bijgewerkt op 17 oktober 2026: Grounding DINO opnieuw gedraaid na de labelnormalisatie, YOLO-tracking opnieuw gedraaid na de frame-index-fix en SAM 3.1 toegevoegd. Het bijbehorende cijfermateriaal staat in `outputs/Disassembly1/comparison/` (niet in git; opnieuw te genereren met `run_compare_models.bat`).*
 
 > **Stand van zaken:** de SAM3-promptbug is gefixt en SAM3 is opnieuw gedraaid. Grounding DINO is opnieuw gedraaid met de aangescherpte labelnormalisatie, zodat `##drive`/`screwr`-fragmenten niet meer als aparte klassen in de CSV staan. SAM 3.1 is toegevoegd. De vier trackingvarianten (YOLO-World, Grounding DINO, SAM3 en SAM 3.1) zijn nog niet volledig op de video gedraaid; alleen YOLO-tracking staat in de trackingtabel.
+>
+> **Let op:** dit rapport gaat over toolrecognition (objectdetectie). Handdetectie, VITRA (3D-handvoorspelling) en actieclassificatie zijn andere taken en staan niet in de detectiescore. Zie [Benchmarking.md](Benchmarking.md) voor de taakbewuste methode en de actie-/temporele metrics.
 
 ## 1. Doel
 

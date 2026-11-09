@@ -8,7 +8,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/baseline.yaml")
     parser.add_argument("--device", choices=DEVICES,
-                        help="cpu of gpu; overschrijft 'device' uit de config")
+                        help="auto, cpu of gpu; overschrijft 'device' uit "
+                             "de config")
+    parser.add_argument("--model",
+                        help="modelkeuze voor scripts met meerdere modellen "
+                             "(actieclassificatie: xclip, internvideo2, "
+                             "actionclip)")
     # Bat-level flag (run_common.bat): .bat-scripts geven alle argumenten
     # met %* door, inclusief --upgrade. Batch splitst --upgrade=<waarde> in
     # twee tokens, dus filteren in .bat is onbetrouwbaar; accepteer de flag

@@ -3,7 +3,7 @@ output_dir: "outputs/Disassembly1"        # relatief pad
 yolo_model: "models/yolo26x.pt"          # pretrained COCO; wordt gedownload als het ontbreekt
 conf_threshold: 0.25
 max_hands: 2
-device: "gpu"                            # "cpu" of "gpu"; --device overschrijft dit
+device: "auto"                           # "auto", "cpu" of "gpu"; auto kiest GPU als CUDA werkt, anders CPU; --device overschrijft dit
 # auto_install_torch: false              # opt-in: CUDA-torch (~2GB) automatisch installeren bij --device gpu; standaard volgt een foutmelding met installatie-commando
 frame_stride: 2                          # 1 = elk frame
 screenshot_every: 150                    # elke ~5 s bij 30 fps; 0 = geen voorbeeldframes
@@ -73,6 +73,57 @@ vitra_mano_path: "third_party/VITRA/weights/mano"
 vitra_image_size: 224                           # korte zijde die VITRA verwacht
 save_vitra_video: true                          # debug-video met instructie en voorspelde handbaan
 vitra_debug_repeat_frames: true                  # herhaal elk voorspelframe tot de bronfps (anders 1 fps video)
+# Actieclassificatie (InternVideo2, X-CLIP, ActionCLIP)
+# Elk model classificeert clips tegen deze klassen; pas de lijst aan voor je
+# eigen dataset. Engelse prompts werken het best voor de zero-shot modellen.
+action_classes:
+  - "unscrewing a screw"
+  - "tightening a screw"
+  - "picking up a tool"
+  - "putting down a tool"
+  - "prying open a part"
+  - "rotating a part"
+  - "idle"
+action_templates:                                # "{}" wordt per klasse ingevuld
+  - "a video of a person {}"
+  - "the person is {}"
+  - "{}"
+# action_prompts:                                # optioneel: eigen prompt(s) per klasse
+#   "unscrewing a screw": "a person unscrewing a screw with a screwdriver"
+action_frames: 8                                 # fallback; het gekozen checkpoint bepaalt het echte aantal frames (X-CLIP 32/16/8, ActionCLIP 8/16/32)
+action_span: 30                                  # videoframes waarover clipfragmenten worden verdeeld voor gespecialiseerde classifiers (~1 s bij 30 fps)
+action_stride: 30                                # start elke volgende classifier-clip 30 frames later (~1 classificatie/seconde)
+action_top_k: 3                                  # aantal scores in de CSV-kolom top_k en de debug-overlay
+action_model: "xclip"                            # standaardmodel als --model ontbreekt
+xclip_model: "microsoft/xclip-base-patch16-zero-shot"
+internvideo2_model: "OpenGVLab/InternVideo2_CLIP_S"   # HF-model met remote code; ~0,4B
+internvideo2_trust_remote_code: true
+# internvideo2_revision: "main"
+actionclip_model: "ViT-B/32-8"                   # "ViT-B/32-8", "ViT-B/16-8", "ViT-B/16-16" of "ViT-B/16-32"
+# actionclip_checkpoint: "models/vit-b-32-8f.pth"   # optioneel lokaal of URL; leeg = automatisch downloaden
+actionclip_clip_cache: "models/clip"             # cache voor de OpenAI-CLIP ViT-gewichten
+# Generatieve VLM-actiemodellen (let op: Qwen3-VL is een algemene VLM,
+# geen gespecialiseerde temporele actieclassifier; meet label en tijden apart)
+smolvlm2_model: "HuggingFaceTB/SmolVLM2-2.2B-Instruct"
+llavaction_model: "MLAdaptiveIntelligence/LLaVAction-7B"
+qwen3vl_model: "Qwen/Qwen3-VL-8B-Instruct"
+vlm_frames: 8                                    # frames per clip voor VLM's
+vlm_max_new_tokens: 256                         # JSON-antwoord is kort; lager = sneller
+vlm_dtype: "auto"                                # auto = bf16 op GPU, fp32 op CPU
+vlm_clip_span: 90                                # ~3 s context voor temporele VLM's
+vlm_clip_stride: 90                              # volgende VLM-clip elke ~3 s
+# llavaction_frames: 8
+# llavaction_dtype: "bfloat16"                   # "bfloat16" of "float16"
+# llavaction_attn_implementation: "sdpa"
+llavaction_runtime_path: "third_party/llavaction_runtime"  # transformers 4.x-subprocess
+# action_ground_truth: "data/action_ground_truth.csv"  # optioneel: classificatie + temporele IoU
+save_xclip_video: true                           # debug-video per actiemodel
+save_internvideo2_video: true
+save_actionclip_video: true
+save_smolvlm2_video: true
+save_llavaction_video: true
+save_qwen3vl_video: true
+action_debug_repeat_frames: true                 # herhaal elk clipframe tot de bronfps (anders ~1 fps video)
 # Snelheid (detectie-neutraal: zelfde imgsz/drempels/gewichten, alleen snellere kernels/codering)
 yolo_half: true                            # FP16-inferentie op CUDA (Ultralytics half=True)
 yolo_fuse: true                            # Conv+BN fusie voor YOLO-modellen

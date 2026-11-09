@@ -7,7 +7,7 @@ if errorlevel 1 (
     popd
     exit /b 1
 )
-echo [4/4] Modelvergelijking uitvoeren...
+echo [4/4] Taakbewust benchmarkrapport uitvoeren...
 "%PYTHON%" -u src\compare_models.py --config configs\baseline.yaml %*
 set "EXIT_CODE=%ERRORLEVEL%"
 if "%EXIT_CODE%"=="0" (
@@ -15,7 +15,7 @@ if "%EXIT_CODE%"=="0" (
     echo Klaar. Het rapport staat in outputs\Disassembly1\comparison
 ) else (
     echo.
-    echo ERROR: De modelvergelijking is gestopt met code %EXIT_CODE%.
+    echo ERROR: Het benchmarkrapport is gestopt met code %EXIT_CODE%.
 )
 popd
 exit /b %EXIT_CODE%

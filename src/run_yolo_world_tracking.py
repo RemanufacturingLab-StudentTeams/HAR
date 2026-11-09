@@ -7,12 +7,12 @@ in ``run_tracking.py`` voor het gesloten-vocabulaire YOLO-model.
 """
 import time
 
-from duplo.benchmark import InferenceTimer, write_run_summary
+from duplo.benchmark import TASK_OBJECT_DETECTION, InferenceTimer, write_run_summary
 from duplo.cli import parse_args
 from duplo.detection import YoloDetector
 from duplo.output import write_rows_csv
 from duplo.pipeline import load_step_config, setup_runtime
-from duplo.tracking import (CSV_COLUMNS, ObjectTracker, build_row, draw_tracks)
+from duplo.tracking import CSV_COLUMNS, ObjectTracker, build_row, draw_tracks
 from duplo.video import VideoFrames, video_fps
 from duplo.video_writer import DebugVideoWriter
 
@@ -65,7 +65,8 @@ def main(cfg_path: str, device: str | None = None) -> None:
         frames_processed=len(timer.times_ms),
         elapsed_s=time.perf_counter() - started, rows=rows, timer=timer,
         csv_file="yolo_world_tracking_history.csv",
-        class_field="class_name",
+        class_field="class_name", task=TASK_OBJECT_DETECTION,
+        subtask="tracking",
         extra={"conf_threshold": cfg["conf_threshold"], "frame_stride": stride,
                "tekstprompt": list(cfg["tool_classes"]),
                "track_low_thresh": low_conf})

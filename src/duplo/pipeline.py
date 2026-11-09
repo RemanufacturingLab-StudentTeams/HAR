@@ -8,12 +8,12 @@ Detectie-neutraal: drempels, imgsz, gewichten en annotatie-keuzes blijven in
 de caller; alleen gedeelde orchestratie staat hier.
 """
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
-from duplo.benchmark import InferenceTimer, write_run_summary
-from duplo.config import load_config, resolve_device
+from duplo.benchmark import TASK_OBJECT_DETECTION, InferenceTimer, write_run_summary
+from duplo.config import load_config, resolve_device, resolve_video_path
 from duplo.gpu import ensure_cuda_torch, setup_cuda_optimizations
 from duplo.output import prepare_output_dir, save_screenshot, write_rows_csv
 from duplo.video import VideoFrames, video_fps
@@ -22,7 +22,10 @@ from duplo.video_writer import DebugVideoWriter
 
 def setup_runtime(cfg: dict, cli_device: str | None = None) -> str:
     """Resolve device + CUDA-setup. Retourneert effectieve `device`."""
+    configured = str(cli_device or cfg.get("device", "auto")).strip().lower()
     device = resolve_device(cli_device, cfg)
+    if configured == "auto" and cli_device is None:
+        print(f"Device automatisch gekozen: {device.upper()}")
     if device == "gpu":
         ensure_cuda_torch(
             auto_install=bool(cfg.get("auto_install_torch", False)))
@@ -33,6 +36,7 @@ def setup_runtime(cfg: dict, cli_device: str | None = None) -> str:
 def load_step_config(cfg_path: str, step: str) -> tuple[dict, Path]:
     """Laad config + maak `output_dir/<step>` aan."""
     cfg = load_config(cfg_path)
+    resolve_video_path(cfg)
     out_dir = prepare_output_dir(cfg, step)
     return cfg, out_dir
 
@@ -65,6 +69,8 @@ def finish_detection_run(out_dir: Path, step: str, *, model: str, device: str,
                          started: float, rows: list[dict], timer: InferenceTimer,
                          csv_file: str, columns: Sequence[str] | None = None,
                          class_field: str = "klasse",
+                         task: str = TASK_OBJECT_DETECTION,
+                         subtask: str | None = None,
                          extra: dict | None = None) -> dict:
     """Schrijf CSV + summary en print één regel resultaat. Retourneert summary."""
     columns = list(columns) if columns is not None else (
@@ -75,7 +81,8 @@ def finish_detection_run(out_dir: Path, step: str, *, model: str, device: str,
         frames_read=frames.frames_read,
         frames_processed=len(timer.times_ms),
         elapsed_s=time.perf_counter() - started, rows=rows, timer=timer,
-        csv_file=csv_file, class_field=class_field, extra=extra)
+        csv_file=csv_file, class_field=class_field, task=task,
+        subtask=subtask, extra=extra)
     print(f"{frames.frames_read} frames verwerkt, {len(rows)} rijen, "
           f"{summary['inference_fps']} fps -> {out_dir}")
     return summary

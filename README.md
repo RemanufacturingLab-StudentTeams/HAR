@@ -5,15 +5,16 @@ Proof of concept voor het automatisch analyseren van DUPLO-disassemblyvideo's. D
 ## Projectstructuur
 
 - `configs/` – instellingen per experiment (video, model, drempels, device)
-- `data/` – invoervideo's (niet in git)
-- `Documentation/` – [Opdracht.md](Documentation/Opdracht.md) (opdrachtomschrijving), [PLAN.md](Documentation/PLAN.md) (technisch plan), [Modelvergelijking.md](Documentation/Modelvergelijking.md) (testrapport van de modelvergelijking) en [MediaPipe_annotering.md](Documentation/MediaPipe_annotering.md) (handleiding voor handmatige actieannotatie)
+- `data/` – invoervideo's (niet in git; zie `data/README.md` voor de plaatsing en automatische fallback)
+- `Documentation/` – [Opdracht.md](Documentation/Opdracht.md) (opdrachtomschrijving), [PLAN.md](Documentation/PLAN.md) (technisch plan), [Modelvergelijking.md](Documentation/Modelvergelijking.md) (testrapport van de modelvergelijking), [Benchmarking.md](Documentation/Benchmarking.md) (taakbewuste benchmarkmethodiek en temporele evaluatie) en [MediaPipe_annotering.md](Documentation/MediaPipe_annotering.md) (handleiding voor handmatige actieannotatie)
 - `models/` – gedownloade modelgewichten (`yolo26x.pt`, `yolo26x-seg.pt`, `yolov8x-worldv2.pt`, `hand_landmarker.task`, `sam3.1_multiplex.pt` en optioneel `sam3.pt`; niet in git, worden waar nodig automatisch gedownload)
 - `third_party/VITRA/` – optionele clone van de officiële microsoft/VITRA-repo (niet in git; zie de VITRA-sectie)
-- `outputs/` – resultaten per video, per stap een eigen submap (`yolo/`, `handpose/`, `tracking/`, `yolo_world_tracking/`, `grounding_dino_tracking/`, `sam3_tracking/`, `sam31_tracking/`, `rfdetr/`, `rfdetr_seg/`, `grounding_dino/`, `yolo_world/`, `yolo_seg/`, `sam3/`, `sam31/`, `vitra/` en `comparison/`) met CSV's, voorbeeldframes en debug-video; de trackingvarianten verschijnen pas na een run
-- `src/duplo/` – gedeelde componenten: CLI, config, GPU-setup (`gpu.py`, incl. `to_cuda_device`), video-inlezen (`video.py`), output (`output.py`), detectie (`detection.py` met `Detector`-protocol + `create_detector`), ByteTrack-tracking (`tracking.py`), benchmark-samenvatting (`benchmark.py`), CSV-schema's (`schema.py`), annotatie (`annotate.py`), VITRA-adapter (`vitra.py`, `vitra_state.py` voor HaWoR/MoGe/MANO) en pipeline-orchestratie (`pipeline.py` met `setup_runtime/run_detection_loop`)
+- `outputs/` – resultaten per video, per stap een eigen submap (`yolo/`, `handpose/`, `tracking/`, `yolo_world_tracking/`, `grounding_dino_tracking/`, `sam3_tracking/`, `sam31_tracking/`, `rfdetr/`, `rfdetr_seg/`, `grounding_dino/`, `yolo_world/`, `yolo_seg/`, `sam3/`, `sam31/`, `vitra/`, `xclip/`, `internvideo2/`, `actionclip/` en `comparison/`) met CSV's, voorbeeldframes en debug-video; de tracking- en actievarianten verschijnen pas na een run
+- `src/duplo/` – gedeelde componenten: CLI, config, GPU-setup (`gpu.py`, incl. `to_cuda_device`), video-inlezen (`video.py`), output (`output.py`), detectie (`detection.py` met `Detector`-protocol + `create_detector`), ByteTrack-tracking (`tracking.py`), taakbewuste benchmark-samenvattingen (`benchmark.py`), CSV-schema's (`schema.py`), annotatie (`annotate.py`), VITRA-adapter (`vitra.py`, `vitra_state.py` voor HaWoR/MoGe/MANO), actieclassificatie (`actions.py` voor clip-sampling/prompts/X-CLIP/InternVideo2, `actionclip.py` voor ActionCLIP, `vlm_actions.py` voor SmolVLM2/LLaVAction/Qwen3-VL en `action_eval.py` voor temporele metrics) en pipeline-orchestratie (`pipeline.py` met `setup_runtime/run_detection_loop`)
 - `src/run_yolo_video.py` – YOLO-pipeline (detectie, in dit project gericht op gereedschappen)
 - `src/run_handpose.py` – MediaPipe-pipeline (handlandmarks, met `handpose_summary.json` voor timing)
 - `src/run_vitra_test.py` – VITRA-pipeline (zero-shot handactie-voorspelling, met optionele HaWoR + MoGe + MANO-statepass)
+- `src/run_action_test.py` – actieclassificatie-pipeline voor InternVideo2, X-CLIP, ActionCLIP, SmolVLM2, LLaVAction en Qwen3-VL (`--model`)
 - `src/run_tracking.py` – YOLO + ByteTrack-pipeline (objecten volgen over frames, met `tracking_summary.json`)
 - `src/run_yolo_world_tracking.py` / `src/run_grounding_dino_tracking.py` / `src/run_sam3_tracking.py` / `src/run_sam31_tracking.py` – open-vocabulary detector + ByteTrack (zelfde tracking-CSV als `run_tracking.py`)
 - `src/run_rfdetr_video.py` – RF-DETR-detectie (COCO-gewichten)
@@ -23,9 +24,10 @@ Proof of concept voor het automatisch analyseren van DUPLO-disassemblyvideo's. D
 - `src/run_yolo_seg_video.py` – YOLO26-segmentatie (maskers)
 - `src/run_sam3_video.py` – SAM3-segmentatie (open-vocabulary, vereist Hugging Face-toegang)
 - `src/run_sam31_video.py` – SAM 3.1-segmentatie via Ultralytics (open-vocabulary, `sam3.1_multiplex.pt`, vereist Hugging Face-toegang)
-- `src/compare_models.py` – vergelijkt de modeltesten op tooldetectie en snelheid (detectie-score + aparte tracking-tabel `tracking_comparison.csv`)
+- `src/compare_models.py` – taakbewust benchmarkrapport: detectiescore plus aparte tabellen voor tracking, handdetectie, VITRA en actieclassificatie (`benchmark_overview.json`, `tracking_comparison.csv`, `action_comparison.csv`)
+- `requirements.txt` / `requirements-vitra.txt` / `requirements-llavaction.txt` – hoofd- en geïsoleerde runtime-dependencies (VITRA/LLaVAction op transformers 4.x)
 - `run_common.bat` – gedeelde venv + pip fast-check (hash van `requirements.txt`; `pip install` wordt overgeslagen bij ongewijzigde hash; forceer met `--upgrade`)
-- `run_yolo_test.bat` / `run_handpose_test.bat` / `run_tracking_test.bat` / `run_rfdetr_test.bat` / `run_rfdetr_seg_test.bat` / `run_grounding_dino_test.bat` / `run_yolo_world_test.bat` / `run_yolo_seg_test.bat` / `run_sam3_test.bat` / `run_sam31_test.bat` / `run_sam31_tracking_test.bat` / `run_vitra_test.bat` / `run_compare_models.bat` – dunne startscripts voor Windows (roepen `run_common.bat` aan)
+- `run_yolo_test.bat` / `run_handpose_test.bat` / `run_tracking_test.bat` / `run_rfdetr_test.bat` / `run_rfdetr_seg_test.bat` / `run_grounding_dino_test.bat` / `run_yolo_world_test.bat` / `run_yolo_seg_test.bat` / `run_sam3_test.bat` / `run_sam31_test.bat` / `run_sam31_tracking_test.bat` / `run_vitra_test.bat` / `run_xclip_test.bat` / `run_internvideo2_test.bat` / `run_actionclip_test.bat` / `run_smolvlm2_test.bat` / `run_llavaction_test.bat` / `run_qwen3vl_test.bat` / `run_compare_models.bat` / `run_benchmark.bat` / `run_benchmark_suite.bat` / `run_unit_tests.bat` – dunne startscripts voor Windows (roepen `run_common.bat` aan)
 
 SAM 3.1 gebruikt in `configs/baseline.yaml` een eigen `sam31_tracking`-blok:
 de lage `detection_conf`-drempel levert kandidaten voor ByteTrack, terwijl
@@ -39,7 +41,19 @@ Dubbelklik op `run_yolo_test.bat` vanuit de projectmap. Via `run_common.bat` wor
 
 De eerste run downloadt automatisch het pretrained model `models/yolo26x.pt` als dat nog ontbreekt. De resultaten komen in `outputs/Disassembly1/yolo/`, met detections in `yolo_detections.csv`, voorbeeldframes als JPG-bestanden en een `yolo_debug.mp4` met de getekende bboxes en labels (uit te zetten met `save_yolo_video: false` in de config). Daarnaast schrijft de stap `yolo_summary.json` met de rekentijd per frame, zodat YOLO in `compare_models.py` als baseline meekan.
 
-## Modelvergelijking: toolrecognition
+## Op een andere pc (portability)
+
+Een verse clone werkt zonder absolute paden of handmatige venv-setup:
+
+1. Installeer **Python 3.10 of nieuwer** (3.13 is getest) en **Git**; vink bij Python "Add python.exe to PATH" aan.
+2. Zet eventueel een video in `data/` (bijvoorbeeld `data/Disassembly1.mp4`). Staat er precies één mp4 in `data/`, dan gebruikt de pipeline die automatisch wanneer het ingestelde `video_path` niet bestaat.
+3. Dubbelklik op een `run_*_test.bat`-bestand. `run_common.bat` zoekt zelf naar `py`, `python` of `python3`, maakt zo nodig `models/`, `data/`, `outputs/` en een `.venv` aan, installeert alleen bij gewijzigde `requirements.txt` en controleert de imports.
+
+`device: "auto"` in `configs/baseline.yaml` kiest een NVIDIA-GPU als CUDA beschikbaar is en valt anders terug op CPU. Zo kan dezelfde clone op een laptop zonder GPU draaien; de zwaarste modellen (VITRA, SAM3) blijven wel praktisch GPU-werk. Een bestaande `.venv` van een andere pc of Python-versie wordt automatisch opnieuw aangemaakt. Met `run_*_test.bat --upgrade` forceer je een volledige herinstallatie. Draai `run_unit_tests.bat` voor de automatische tests zonder model of GPU.
+
+## Benchmarken per modeltaak
+
+Het project heeft vier modelcategorieën die apart worden gemeten: **objectdetectie/segmentatie/tracking**, **handdetectie**, **3D-handvoorspelling (VITRA)** en **actieclassificatie**. Elke summary bevat sinds benchmarkversie 2 een `task`, timing, sample-aantallen en hardware/softwaremetadata. De volledige methodiek staat in [Documentation/Benchmarking.md](Documentation/Benchmarking.md).
 
 Voor de toolrecognition zijn naast YOLO zeven alternatieven toegevoegd met dezelfde opzet (video in, CSV + voorbeeldframes + debug-video uit). Elk model schrijft in een eigen submap van `outputs/Disassembly1/` en levert naast de CSV ook een `<model>_summary.json` met frames, detections en rekentijd:
 
@@ -54,7 +68,7 @@ Voor de toolrecognition zijn naast YOLO zeven alternatieven toegevoegd met dezel
 | `run_sam3_test.bat` | SAM3 | segmentatie, open-vocabulary | `sam3/` |
 | `run_sam31_test.bat` | SAM 3.1 (Object Multiplex-checkpoint) | segmentatie, open-vocabulary | `sam31/` |
 
-De doelgereedschappen staan als `tool_classes` in `configs/baseline.yaml` (schroevendraaier, steeksleutel, tang, snijder, hamer). De open-vocabulary modellen krijgen die lijst als tekstprompt; de andere modellen gebruiken hun eigen COCO-klassen en kunnen dus alleen gereedschappen vinden die in COCO zitten. De segmentatiestappen loggen ook `mask_area` (maskeroppervlak in pixels). VITRA is geen detectiemodel en doet daarom niet mee in deze detectie-score; die stap staat apart beschreven in [VITRA: zero-shot handactie-voorspelling](#vitra-zero-shot-handactie-voorspelling).
+De doelgereedschappen staan als `tool_classes` in `configs/baseline.yaml` (schroevendraaier, steeksleutel, tang, snijder, hamer). De open-vocabulary modellen krijgen die lijst als tekstprompt; de andere modellen gebruiken hun eigen COCO-klassen en kunnen dus alleen gereedschappen vinden die in COCO zitten. De segmentatiestappen loggen ook `mask_area` (maskeroppervlak in pixels). VITRA en de actieclassifiers (InternVideo2, X-CLIP, ActionCLIP, SmolVLM2, LLaVAction en Qwen3-VL) zijn geen detectiemodellen en doen daarom niet mee in deze detectie-score. VITRA staat apart in [VITRA: zero-shot handactie-voorspelling](#vitra-zero-shot-handactie-voorspelling); de classifiers staan in [Actieclassificatie](#actieclassificatie-internvideo2-x-clip-actionclip-smolvlm2-llavaction-en-qwen3-vl).
 
 Alle detectiestappen gebruiken hetzelfde schema (`video`, `frame`, `timestamp`, `klasse`, `confidence`, `bbox_x`, `bbox_y`, `bbox_w`, `bbox_h`; centraal vastgelegd in `src/duplo/schema.py`), bij segmentatie aangevuld met `mask_area` als pixel-count op frame-resolutie (YOLO-seg via gerasteriseerd polygoon, RF-DETR-seg/SAM via geresized masker — alleen onderling vergelijkbaar binnen segmentatie). Tracking gebruikt `tracking_history.csv` (`frame_number`, `track_id`, `class_name`, `bbox_x1/y1/x2/y2`, `center`, `velocity`, `track_age`, `frames_since_detection`, `status`; zie `src/duplo/tracking.py:CSV_COLUMNS`), handpose `hand_landmarks.csv` (`video`, `frame`, `hand`, `landmark`, `x/y/z`). `compare_models.py` normaliseert `frame/frame_number` en `klasse/class_name`, zodat oude en nieuwe CSV's beide lezen.
 
@@ -64,15 +78,25 @@ Alle detectiestappen gebruiken hetzelfde schema (`video`, `frame`, `timestamp`, 
 
 De SAM 3.1-checkpoints (Object Multiplex, `sam3.1_multiplex.pt`) verbeteren volgens Meta vooral het *videomodel* (~7x sneller bij veel objecten); Ultralytics laadt hetzelfde checkpoint ook voor beeldinferentie, dus `run_sam31_test.bat` vergelijkt de actuele SAM 3.1-beelddetector met de SAM3-test (`sam3.pt`). De repositoryversie van de SAM3-code pint `numpy<2` en vraagt `pkg_resources` (`setuptools<81`); `requirements.txt` gebruikt daarom bewust de PyPI-release (`sam3==0.1.4`, werkt met numpy 2.x op Python 3.13) en niet de git-versie — gebruik voor die git-versie een aparte venv.
 
-### Vergelijken
+### Benchmarkrapport maken
 
 Draai eerst de testen die je wilt vergelijken en daarna:
 
 ```bat
+run_benchmark.bat
 run_compare_models.bat
+run_benchmark.bat --task action_classification
+run_benchmark.bat --task hand_detection
+run_benchmark_suite.bat        rem unittests + benchmarkrapport in één keer
 ```
 
-`src/compare_models.py` leest alle detectiestappen in `outputs/Disassembly1/` (`*_detections.csv` + summary) en schrijft `outputs/Disassembly1/comparison/model_comparison.csv` en `model_comparison.md` met daarin per model: gevonden toolklassen, tool-detecties, aandeel frames met een tool, gemiddelde confidence, detecties per frame, rekentijd en doorvoer. Tracking (`*_tracking_history.csv`) krijgt een aparte tabel `tracking_comparison.csv` (tracks, rijen/frame, `confirmed/tentative/occluded`, timing) en weegt niet mee in de detectie-score. De rangschikking is een expliciet weegbare heuristic:
+`src/compare_models.py` leest alle run-CSV's in `outputs/Disassembly1/` en schrijft naar `comparison/`:
+
+- `model_comparison.md` met een overzicht per taak en aparte secties voor objectdetectie, tracking, handdetectie, 3D-handvoorspelling en actieclassificatie;
+- `model_comparison.csv` (detectie), `tracking_comparison.csv` (tracking) en `action_comparison.csv` (acties);
+- `benchmark_overview.json` met per taak de gebruikte modellen en de hardware/softwaremetadata.
+
+Tracking, handdetectie, VITRA en actieclassificatie wegen niet mee in de detectiescore. De rangschikking voor objectdetectie is een expliciet weegbare heuristic:
 
 ```text
 score = 100 x (coverage x dekking + presence x tool-frames + speed x min(1, doorvoer/target_fps))
@@ -82,7 +106,7 @@ De gewichten (`comparison_weights`) en `comparison_target_fps` (de doorvoer die 
 
 Het volledige testrapport met de resultaten van alle modellen staat in [Documentation/Modelvergelijking.md](Documentation/Modelvergelijking.md).
 
-Let op de kanttekeningen in het rapport: er is geen geannoteerde ground truth, dus accuracy (precision/recall) kan niet worden gemeten; dekking en tool-frames zijn proxies en bevoordelen open-vocabulary modellen, die hun promptklassen per definitie kunnen terugvinden. Confidence is niet tussen modelfamilies te vergelijken. Gebruik de debug-video's en voorbeeldframes per stap voor het kwalitatieve oordeel.
+Let op de kanttekeningen in het rapport: voor objectdetectie is er geen geannoteerde ground truth, dus accuracy (precision/recall) kan niet worden gemeten; dekking en tool-frames zijn proxies en bevoordelen open-vocabulary modellen, die hun promptklassen per definitie kunnen terugvinden. Voor actieclassificatie kun je met `action_ground_truth` wél classificatie-accuracy en temporele IoU meten. Confidence is niet tussen modelfamilies te vergelijken. Gebruik de debug-video's en voorbeeldframes per stap voor het kwalitatieve oordeel.
 
 ## Eerste MediaPipe-test
 
@@ -186,7 +210,7 @@ De statebron wordt in deze volgorde gekozen:
 
 De nul-state werkt, maar de voorspelling is dan grof: de huidige handpositie en -pose ontbreken. Omdat er dan geen echte state is, geeft de stap die hand als **onbekend** aan VITRA door (state-masker uit) in plaats van als een geldige neutrale pose. De VITRA-repo bevat `examples/0001.npy` en `examples/0002.npy` met echte MANO-states; let op dat `0002.npy` alleen een rechterhand bevat, dus bij `vitra_hands: ["left", "right"]` krijgt de linkerhand daar het "onbekend"-masker (met een waarschuwing). Voor je eigen video is de reconstructie-route (pass 1) de bedoelde manier. Zo'n `.npy`/`.npz` kan pickles bevatten; gebruik alleen bestanden die je zelf of de VITRA-repo hebt gemaakt. Het MANO-model zelf is niet vrij voor commercieel gebruik; zie de licentie op https://mano.is.tue.mpg.de/.
 
-Net als bij handpose wordt VITRA niet meegenomen in `compare_models.py`: de stap levert geen tool-detecties maar continue handacties. Gebruik de CSV en de debug-video voor de kwalitatieve beoordeling.
+Net als bij handpose wordt VITRA niet meegenomen in de detectiescore, maar sinds benchmarkversie 2 verschijnt de stap wel in een eigen tabel in `compare_models.py` (`3d_hand_prediction`: frames, actierijen, handen, chunk en fps). Gebruik daarnaast de CSV en de debug-video voor de kwalitatieve beoordeling.
 
 Wat VITRA wel en niet doet, zodat de output niet verkeerd gelezen wordt:
 
@@ -200,6 +224,82 @@ De VITRA-rijbouw, state-parsing, padding en checkpoint-remapping zijn los te tes
 .venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
+## Actieclassificatie: InternVideo2, X-CLIP, ActionCLIP, SmolVLM2, LLaVAction en Qwen3-VL
+
+Actieclassifiers kijken niet naar losse objecten, maar classificeren een clip van meerdere frames als één actie uit `action_classes`. Alle modellen gebruiken dezelfde clipindeling en hetzelfde CSV-schema, zodat ze onderling vergelijkbaar zijn:
+
+| Startscript | Model | Soort | Submap |
+| --- | --- | --- | --- |
+| `run_xclip_test.bat` | X-CLIP (`microsoft/xclip-base-patch16-zero-shot`) | zero-shot video-text classifier | `xclip/` |
+| `run_internvideo2_test.bat` | InternVideo2-CLIP-S (`OpenGVLab/InternVideo2_CLIP_S`) | zero-shot video-text classifier | `internvideo2/` |
+| `run_actionclip_test.bat` | ActionCLIP ViT-B/32 (MMAction2-port) | Kinetics-getrainde clip-classifier | `actionclip/` |
+| `run_smolvlm2_test.bat` | SmolVLM2 2.2B (`HuggingFaceTB/SmolVLM2-2.2B-Instruct`) | compacte generatieve video-VLM | `smolvlm2/` |
+| `run_llavaction_test.bat` | LLaVAction-7B (`MLAdaptiveIntelligence/LLaVAction-7B`) | op acties gefinetunede LLaVA-Qwen | `llavaction/` |
+| `run_qwen3vl_test.bat` | Qwen3-VL-8B (`Qwen/Qwen3-VL-8B-Instruct`) | algemene generatieve video-VLM | `qwen3vl/` |
+
+```bat
+run_xclip_test.bat
+run_internvideo2_test.bat
+run_actionclip_test.bat
+run_smolvlm2_test.bat
+run_llavaction_test.bat
+run_qwen3vl_test.bat
+run_xclip_test.bat --device cpu
+```
+
+De modellen downloaden hun gewichten bij de eerste run automatisch (X-CLIP/InternVideo2/SmolVLM2/Qwen3-VL naar de Hugging Face-cache, ActionCLIP naar `models/` en LLaVAction via Hugging Face). De generatieve VLM's zijn praktisch GPU-werk: SmolVLM2-2.2B is het lichtst, Qwen3-VL-8B vraagt ongeveer 16 GB in bf16 en LLaVAction-7B is ~15 GB. InternVideo2 gebruikt `trust_remote_code`; de adapter voorziet een no-op `flash_attn`-shim en een compatibiliteitspatch voor transformers 5. LLaVAction-7B valt onder **CC-BY-NC-SA-4.0** (niet-commercieel) en vereist een CUDA-GPU vanwege de officiële inferencecode. Omdat `llavaction==0.0.1` tegen transformers 4.x is gebouwd, installeert `run_llavaction_test.bat` eenmalig `third_party\llavaction_runtime` uit `requirements-llavaction.txt` en draait de stap in een subprocess met die runtime; de hoofd-venv blijft op transformers 5.x. **Qwen3-VL is een algemene VLM, geen gespecialiseerde temporele actieclassifier**: het label en de start/end-tijden worden daarom apart gemeten met `action_ground_truth`.
+
+De resultaten komen per model in `outputs/Disassembly1/<model>/`:
+
+- `<model>_actions.csv` – één rij per clip: `video`, `frame` (clipstart), `timestamp`, `clip_start`, `clip_end`, `klasse`, `confidence`, `start_s`, `end_s`, `top_k` en `raw_response`. `start_s`/`end_s` zijn alleen gevuld bij VLM's die tijden voorspellen; `raw_response` bewaart de ruwe VLM-uitvoer. Het schema staat in `src/duplo/schema.py:ACTION_COLUMNS`.
+- `<model>_debug.mp4` – per clip het voorspelde label, de confidence, de top-k scores en (indien beschikbaar) de voorspelde tijden (uit te zetten met `save_<model>_video: false`).
+- `<model>_frame_*.jpg` – voorbeeldframes volgens `screenshot_every`.
+- `<model>_summary.json` – timing, clipinstellingen, prompts, aantal clips, taakmetadata en (met ground truth) de classificatie- en temporele metrics.
+
+De actie-opties staan bij elkaar in `configs/baseline.yaml`:
+
+| Sleutel | Betekenis |
+| --- | --- |
+| `action_classes` | Lijst met acties; pas die aan voor je eigen video/dataset. |
+| `action_templates` | Teksttemplates met `{}`; per klasse worden meerdere prompts gemiddeld. |
+| `action_prompts` | Optioneel: eigen prompt of lijst prompts per klasse (heeft voorrang). |
+| `action_frames` / `action_span` / `action_stride` | Fallback voor frames per clip, venster in videoframes en stap tussen clipstarts; het checkpoint bepaalt het echte aantal frames. |
+| `action_top_k` | Aantal scores in `top_k` en de overlay. |
+| `action_model` | Standaardmodel als `--model` ontbreekt (`xclip`, `internvideo2`, `actionclip`, `smolvlm2`, `llavaction` of `qwen3vl`). |
+| `xclip_model` / `internvideo2_model` | Hugging Face-repo-id of lokaal pad. |
+| `internvideo2_trust_remote_code` / `internvideo2_revision` | Remote-code toestaan (standaard `true`) en optioneel een vaste HF-revisie. |
+| `actionclip_model` | `ViT-B/32-8`, `ViT-B/16-8`, `ViT-B/16-16` of `ViT-B/16-32`. |
+| `actionclip_checkpoint` | Optioneel lokaal checkpoint of URL; leeg = automatisch downloaden. |
+| `smolvlm2_model` / `llavaction_model` / `qwen3vl_model` | Hugging Face-repo-id of lokaal pad voor de VLM's. |
+| `vlm_frames` / `vlm_max_new_tokens` / `vlm_dtype` | Frames per VLM-clip, antwoordlengte en dtype (`auto` = bf16 op GPU). |
+| `vlm_clip_span` / `vlm_clip_stride` | Langere context (~3 s) voor temporele VLM-voorspellingen. |
+| `llavaction_dtype` / `llavaction_attn_implementation` / `llavaction_runtime_path` | Dtype, attention-backend en de aparte transformers 4.x-runtime voor LLaVAction (CUDA vereist). |
+| `action_ground_truth` | Optioneel CSV/JSON met `video,action,start_s,end_s` voor accuracy en temporele IoU. |
+| `save_xclip_video` / `save_internvideo2_video` / `save_actionclip_video` / `save_smolvlm2_video` / `save_llavaction_video` / `save_qwen3vl_video` | Debug-video per model aan/uit. |
+| `action_debug_repeat_frames` | Herhaal elk clipframe tot de bronfps (anders ~1 fps video). |
+
+Het checkpoint bepaalt het aantal frames per clip: de standaard X-CLIP gebruikt 32 frames, InternVideo2 8, ActionCLIP 8 en de VLM's standaard 8 (`vlm_frames`). Voor een snellere X-CLIP-test kun je `xclip_model` op een 8- of 16-frame checkpoint zetten, bijvoorbeeld `microsoft/xclip-base-patch32`.
+
+### Classificatie en temporele nauwkeurigheid apart meten
+
+Zet `action_ground_truth` op een CSV (of JSON) met de echte acties en tijden:
+
+```csv
+video,action,start_s,end_s
+Disassembly1.mp4,unscrewing a screw,12.50,18.20
+Disassembly1.mp4,picking up a tool,18.20,21.00
+Disassembly1.mp4,idle,21.00,24.50
+```
+
+Daarna berekent `src/duplo/action_eval.py` per model:
+
+- **classificatie-accuracy** – klopt het label met de ground-truth-actie die het clipvenster het meest overlapt?
+- **temporele coverage** – welk deel van de clips kreeg start/end-tijden?
+- **mIoU en R@0.5/R@0.7** – nauwkeurigheid van de voorspelde begin-/eindtijden;
+- **start/end MAE** – gemiddelde fout in seconden.
+
+Deze metrics verschijnen in de summary en in `action_comparison.csv` / `model_comparison.md`. Zonder ground truth blijven accuracy/IoU-kolommen leeg, maar `Temp. coverage` laat wel zien welk deel van de clips start/end-tijden kreeg. Confidence is niet tussen modelfamilies te vergelijken. Zie [Documentation/Benchmarking.md](Documentation/Benchmarking.md) voor de volledige definities.
+
 ## ByteTrack-tracking
 
 Dubbelklik op `run_tracking_test.bat` om YOLO + ByteTrack op dezelfde video uit te voeren. Voor SAM 3.1 gebruik je `run_sam31_tracking_test.bat`; de overige open-vocabulary varianten zijn direct via Python te starten (`src/run_yolo_world_tracking.py`, `src/run_grounding_dino_tracking.py` en `src/run_sam3_tracking.py`). Elke detectie krijgt een unieke track-ID die tussen frames stabiel blijft, ook wanneer een object korte tijd aan het zicht onttrokken is (occlusie). De resultaten komen in `outputs/Disassembly1/tracking/` (resp. `yolo_world_tracking/`, `grounding_dino_tracking/`, `sam3_tracking/`, `sam31_tracking/`):
@@ -211,7 +311,7 @@ De trackerinstellingen staan in `configs/baseline.yaml`: `track_high_thresh` (dr
 
 ## Draaien op de GPU
 
-De scripts accepteren een `--device` argument met de waarden `cpu` of `gpu`:
+De scripts accepteren een `--device` argument met de waarden `auto`, `cpu` of `gpu`:
 
 ```bat
 run_yolo_test.bat --device gpu
@@ -225,6 +325,12 @@ run_yolo_seg_test.bat --device gpu
 run_sam3_test.bat --device gpu
 run_sam31_test.bat --device gpu
 run_vitra_test.bat --device gpu
+run_xclip_test.bat --device gpu
+run_internvideo2_test.bat --device gpu
+run_actionclip_test.bat --device gpu
+run_smolvlm2_test.bat --device gpu
+run_llavaction_test.bat --device gpu
+run_qwen3vl_test.bat --device gpu
 ```
 
 Of direct via Python:
@@ -241,9 +347,12 @@ Of direct via Python:
 .venv\Scripts\python.exe src\run_sam3_video.py --config configs\baseline.yaml --device gpu
 .venv\Scripts\python.exe src\run_sam31_video.py --config configs\baseline.yaml --device gpu
 .venv\Scripts\python.exe src\run_vitra_test.py --config configs\baseline.yaml --device gpu
+.venv\Scripts\python.exe src\run_action_test.py --config configs\baseline.yaml --model xclip --device gpu
+.venv\Scripts\python.exe src\run_action_test.py --config configs\baseline.yaml --model qwen3vl --device gpu
+.venv\Scripts\python.exe src\run_action_test.py --config configs\baseline.yaml --model llavaction --device gpu
 ```
 
-Zonder argument gebruiken de scripts de waarde van `device` in `configs\baseline.yaml` (daar staat `gpu`; met `--device cpu` dwing je een CPU-run af).
+Zonder argument gebruiken de scripts de waarde van `device` in `configs\baseline.yaml` (daar staat `auto`: GPU als CUDA beschikbaar is, anders CPU; met `--device gpu` of `--device cpu` dwing je een keuze af).
 
 **YOLO:** bij `--device gpu` controleert het script of torch CUDA ondersteunt. Standaard volgt een foutmelding met het installatie-commando (`pip install -U torch torchvision --index-url https://download.pytorch.org/whl/cu130`); alleen met `auto_install_torch: true` in de config wordt de CUDA-build (~2 GB) automatisch geïnstalleerd. De ByteTrack-tracker draait op de CPU en heeft geen CUDA nodig; alleen de detectie gebruikt de GPU. `yolo_half` (FP16 via `quantize=16`), `yolo_fuse` en `yolo_backend: tensorrt` (opt-in `.engine`-export met fallback op `.pt`) veranderen alleen kernels, geen drempels/gewichten. `video_encoder: auto` gebruikt NVENC indien aanwezig, anders x264, anders mp4v.
 

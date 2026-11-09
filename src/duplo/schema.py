@@ -3,8 +3,8 @@
 Eén bron voor kolomvolgorde, zodat `run_*` scripts en `compare_models.py`
 niet divergeren. Detectie (9 kolommen, met `timestamp`), segmentatie
 (10 kolommen, met `mask_area`), tracking (18 kolommen uit `tracking.py`),
-handpose (8 kolommen) en VITRA-acties (14 kolommen per voorspelde stap)
-staan hier vast.
+handpose (8 kolommen), actieclassificatie (11 kolommen per clip) en
+VITRA-acties (14 kolommen per voorspelde stap) staan hier vast.
 """
 import numpy as np
 
@@ -15,6 +15,10 @@ SEGMENTATION_COLUMNS = [*DETECTION_COLUMNS, "mask_area"]
 
 HANDPOSE_COLUMNS = ["video", "frame", "hand", "landmark", "x", "y", "z",
                     "zichtbaar"]
+
+ACTION_COLUMNS = ["video", "frame", "timestamp", "clip_start", "clip_end",
+                  "klasse", "confidence", "start_s", "end_s", "top_k",
+                  "raw_response"]
 
 VITRA_COLUMNS = ["video", "frame", "timestamp", "sample", "hand", "step",
                  "transl_x", "transl_y", "transl_z", "rot_x", "rot_y",
@@ -49,6 +53,40 @@ def segmentation_row(video_path: str, frame_idx: int, fps: float,
                         x1, y1, x2, y2)
     row["mask_area"] = int(mask_area)
     return row
+
+
+def action_row(video_path: str, clip_start: int, clip_end: int, fps: float,
+               klasse: str, confidence: float | None,
+               top_k: list[tuple[str, float]] | tuple[tuple[str, float], ...]
+               = (),
+               start_s: float | None = None,
+               end_s: float | None = None,
+               raw_response: str | None = None) -> dict:
+    """Eén actieclassificatie-rij voor een gehele clip.
+
+    ``frame`` is het eerste frame van de clip (zodat dezelfde
+    ``frame``/``klasse``/``confidence``-conventie als bij detectie werkt);
+    ``clip_start``/``clip_end`` houden het volledige clipbereik vast.
+    ``start_s``/``end_s`` zijn de door een VLM voorspelde actiegrenzen in
+    seconden (leeg bij classifiers die alleen een label geven).
+    ``top_k`` wordt als leesbare tekst opgeslagen, bijvoorbeeld
+    ``"unscrewing a screw=0.812; idle=0.101"``.
+    """
+    return {
+        "video": video_path,
+        "frame": int(clip_start),
+        "timestamp": round(clip_start / fps, 3) if fps else 0.0,
+        "clip_start": int(clip_start),
+        "clip_end": int(clip_end),
+        "klasse": str(klasse),
+        "confidence": (round(float(confidence), 4)
+                       if confidence is not None else ""),
+        "start_s": round(float(start_s), 3) if start_s is not None else "",
+        "end_s": round(float(end_s), 3) if end_s is not None else "",
+        "top_k": "; ".join(f"{label}={float(score):.4f}"
+                           for label, score in top_k),
+        "raw_response": raw_response or "",
+    }
 
 
 def vitra_action_rows(video_path: str, frame_idx: int, fps: float,

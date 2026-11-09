@@ -1,0 +1,14 @@
+# Aparte transformers-runtime voor LLaVAction-7B.
+#
+# De llavaction-package (0.0.1) is tegen transformers 4.x gebouwd en gebruikt
+# APIs die in transformers 5 zijn verwijderd. De hoofd-venv blijft op
+# transformers 5.x voor SAM3/Qwen3-VL; LLaVAction draait daarom in een
+# subprocess met deze pins op de PYTHONPATH.
+#
+# Installeren (eenmalig, vanuit de projectmap):
+#   .venv\Scripts\python.exe -m pip install --no-deps --target third_party\llavaction_runtime -r requirements-llavaction.txt
+#
+# run_llavaction_test.bat doet dit automatisch als de runtime nog niet bestaat.
+transformers==4.47.1
+tokenizers==0.21.0
+huggingface-hub==0.34.2

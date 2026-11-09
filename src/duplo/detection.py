@@ -22,6 +22,9 @@ def _load_yolo_model(YOLO, cfg: dict, model_key: str, torch_device: str):
     verandert.
     """
     model_path = str(cfg[model_key])
+    # Ook bij directe Python-runs (zonder run_common.bat) moet models/ bestaan
+    # voordat Ultralytics het pretrained bestand daar kan downloaden.
+    Path(model_path).parent.mkdir(parents=True, exist_ok=True)
     backend = str(cfg.get("yolo_backend", "torch")).strip().lower()
     if backend != "tensorrt" or torch_device != "cuda":
         return YOLO(model_path)
