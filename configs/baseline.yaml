@@ -4,7 +4,7 @@ yolo_model: "models/yolo26x.pt"          # pretrained COCO; wordt gedownload als
 conf_threshold: 0.25
 max_hands: 2
 device: "gpu"                           # "auto", "cpu" of "gpu"; auto kiest GPU als CUDA werkt, anders CPU; --device overschrijft dit
-# auto_install_torch: false              # opt-in: CUDA-torch (~2GB) automatisch installeren bij --device gpu; standaard volgt een foutmelding met installatie-commando
+auto_install_torch: true              # opt-in: CUDA-torch (~2GB) automatisch installeren bij --device gpu; standaard volgt een foutmelding met installatie-commando
 frame_stride: 2                          # 1 = elk frame
 screenshot_every: 150                    # elke ~5 s bij 30 fps; 0 = geen voorbeeldframes
 save_yolo_video: true                    # debug-video met YOLO-bboxes en labels
