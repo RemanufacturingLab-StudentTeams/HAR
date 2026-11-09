@@ -15,17 +15,17 @@ Eén rij per geclassificeerde videoclip. De kolomdefinitie staat centraal in
 | `clip_start` | integer | Eerste frame van de clip (inclusief). |
 | `clip_end` | integer | Laatste frame van de clip (exclusief). |
 | `klasse` | string | Voorspelde actie uit `action_classes`. |
-| `confidence` | float of leeg | Confidence van de voorspelde klasse (0-1); leeg bij VLM's zonder gekalibreerde score. |
-| `start_s` | float of leeg | Door het model voorspelde starttijd in seconden (absoluut). |
-| `end_s` | float of leeg | Door het model voorspelde eindtijd in seconden (absoluut). |
+| `confidence` | float of leeg | Confidence van de voorspelde klasse (0-1); optioneel leeg. |
+| `start_s` | float of leeg | Optionele voorspelde starttijd in seconden (absoluut). |
+| `end_s` | float of leeg | Optionele voorspelde eindtijd in seconden (absoluut). |
 | `top_k` | string | Top-k scores als `label=score; label=score`. |
-| `raw_response` | string | Ruwe VLM-uitvoer voor foutanalyse (leeg bij classifiers). |
+| `raw_response` | string | Optionele ruwe modeluitvoer voor foutanalyse. |
 
-De modellen (X-CLIP, InternVideo2, ActionCLIP, SmolVLM2, LLaVAction en
-Qwen3-VL) gebruiken hetzelfde schema, zodat `compare_models.py` ze in
-`action_comparison.csv` kan vergelijken. `start_s`/`end_s` zijn alleen gevuld
-bij modellen die temporele grenzen voorspellen. `action_eval.py` meet die
-tijden apart tegen `action_ground_truth` (IoU, R@IoU en boundary-MAE).
-VITRA's `vitra_actions.csv` valt hier bewust buiten: dat zijn continue
-handacties per voorspelde stap, geen clipclassificatie.
+De modellen (X-CLIP, InternVideo2 en ActionCLIP) gebruiken hetzelfde schema,
+zodat `compare_models.py` ze in `action_comparison.csv` kan vergelijken.
+`start_s`/`end_s` zijn alleen gevuld bij modellen die temporele grenzen
+voorspellen. `action_eval.py` kan die tijden apart meten tegen
+`action_ground_truth` (IoU, R@IoU en boundary-MAE). VITRA's
+`vitra_actions.csv` valt hier bewust buiten: dat zijn continue handacties per
+voorspelde stap, geen clipclassificatie.
 

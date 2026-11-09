@@ -23,11 +23,6 @@ supervision==0.30.9
 # gebruikt, zodat flash-attn niet op elke laptop geinstalleerd hoeft te worden.
 einops==0.8.2
 open_clip_torch==4.2.1
-# Generatieve VLM-actiemodellen: SmolVLM2 en Qwen3-VL via transformers;
-# LLaVAction via het officiele (lichte) llavaction-pakket. num2words is nodig
-# voor de SmolVLM2-videopreprocessor.
-llavaction==0.0.1
-num2words==0.5.14
 # SAM3: gewichten van facebook/sam3 vereisen een goedgekeurde Hugging
 # Face-toegangsaanvraag + 'hf auth login'; sam3 verlaagt numpy naar <2.4 en op
 # Windows is triton-windows nodig (sam3 importeert triton).

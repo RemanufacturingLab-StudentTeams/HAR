@@ -1,8 +1,7 @@
 """Evaluatie van actieclassificatie en temporele localisatie.
 
-Classificatiemodellen voorspellen één label per clip. VLM's zoals Qwen3-VL
-en LLaVAction kunnen daarnaast begin- en eindtijden geven. Deze module meet
-die twee dingen bewust apart:
+Classificatiemodellen voorspellen één label per clip. Modellen die daarnaast
+begin- en eindtijden geven, worden op die twee dingen bewust apart gemeten:
 
 * classificatie: welk label hoort bij de clip (vergeleken met de ground
   truth die de clip het meest overlapt);

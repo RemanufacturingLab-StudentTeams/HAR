@@ -13,17 +13,13 @@ aangevuld met het clipbereik en de top-k scores.
 """
 from __future__ import annotations
 
-import json
-import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
-ACTION_MODEL_KINDS = ("xclip", "internvideo2", "actionclip",
-                      "smolvlm2", "llavaction", "qwen3vl")
-VLM_ACTION_KINDS = ("smolvlm2", "llavaction", "qwen3vl")
+ACTION_MODEL_KINDS = ("xclip", "internvideo2", "actionclip")
 
 DEFAULT_ACTION_TEMPLATES = (
     "a video of a person {}",
@@ -43,20 +39,6 @@ _ACTION_MODEL_ALIASES = {
     "actionclip": "actionclip",
     "action-clip": "actionclip",
     "action_clip": "actionclip",
-    "smolvlm2": "smolvlm2",
-    "smol-vlm2": "smolvlm2",
-    "smol_vlm2": "smolvlm2",
-    "llavaction": "llavaction",
-    "llava-action": "llavaction",
-    "llava_action": "llavaction",
-    "qwen3vl": "qwen3vl",
-    "qwen3-vl": "qwen3vl",
-    "qwen3_vl": "qwen3vl",
-    "qwen3-vl-8b": "qwen3vl",
-    "qwen3-vl-8b-instruct": "qwen3vl",
-    "qwen/qwen3-vl-8b-instruct": "qwen3vl",
-    "huggingfacetb/smolvlm2-2.2b-instruct": "smolvlm2",
-    "mladaptiveintelligence/llavaction-7b": "llavaction",
 }
 
 
@@ -64,10 +46,9 @@ _ACTION_MODEL_ALIASES = {
 class ActionPrediction:
     """Voorspelling voor één clip, inclusief optionele temporele grenzen.
 
-    ``confidence`` is ``None`` voor generatieve VLM's die geen
-    gekalibreerde score geven. ``start_s``/``end_s`` zijn alleen gevuld als
-    het model begin- en eindtijd voorspelt (Qwen3-VL, LLaVAction, SmolVLM2).
-    ``raw_text`` bewaart de ruwe modeluitvoer voor foutanalyse.
+    ``start_s``/``end_s`` zijn alleen gevuld als een model daadwerkelijk
+    begin- en eindtijd voorspelt; de gespecialiseerde classifiers laten ze
+    leeg. ``raw_text`` is optioneel voor foutanalyse.
     """
 
     label: str
@@ -252,136 +233,6 @@ def prediction_from_logits(prompt_set: PromptSet,
         label=prompt_set.classes[best],
         confidence=float(probabilities[best]),
         scores=scores,
-    )
-
-
-def build_vlm_prompt(classes: Sequence[str], clip_start_s: float,
-                     clip_end_s: float) -> str:
-    """Prompt voor een VLM: label plus start/end relative aan de clip."""
-    duration = max(0.0, clip_end_s - clip_start_s)
-    options = "\n".join(f"- {label}" for label in classes)
-    return (
-        "You are analyzing a short video clip from a larger video.\n"
-        f"The clip starts at {clip_start_s:.2f} seconds and lasts "
-        f"{duration:.2f} seconds.\n"
-        "Choose exactly one action from this list:\n"
-        f"{options}\n"
-        "Also estimate when the chosen action starts and ends. Give "
-        "start_s and end_s as seconds relative to the START OF THIS CLIP "
-        f"(0 to {duration:.2f}).\n"
-        "Return ONLY valid JSON, without markdown, with exactly these keys: "
-        '{"action": "...", "start_s": 0.0, "end_s": 0.0, '
-        '"confidence": 0.0}. Use null for the times if you cannot determine '
-        "them."
-    )
-
-
-def _json_object(text: str) -> dict | None:
-    decoder = json.JSONDecoder()
-    for index, char in enumerate(text):
-        if char != "{":
-            continue
-        try:
-            value, _ = decoder.raw_decode(text[index:])
-        except json.JSONDecodeError:
-            continue
-        if isinstance(value, dict):
-            return value
-    return None
-
-
-def _value(record: dict, *names):
-    lowered = {str(key).strip().lower(): value
-               for key, value in record.items()}
-    for name in names:
-        if name in lowered:
-            return lowered[name]
-    return None
-
-
-def _float_value(value) -> float | None:
-    if value is None:
-        return None
-    text = str(value).strip().lower().replace(",", ".")
-    if not text or text in ("none", "null", "nan", "n/a", "n.v.t."):
-        return None
-    try:
-        return float(text)
-    except ValueError:
-        return None
-
-
-def _match_class(value, classes: Sequence[str]) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip().casefold()
-    if not text:
-        return None
-    ordered = sorted(classes, key=len, reverse=True)
-    for label in ordered:
-        if text == label.casefold():
-            return label
-    for label in ordered:
-        if label.casefold() in text:
-            return label
-    return None
-
-
-def parse_vlm_action_response(text: str, classes: Sequence[str],
-                              clip_start_s: float,
-                              clip_end_s: float) -> ActionPrediction:
-    """Parse een VLM-antwoord naar label, confidence en absolute tijden.
-
-    De prompt vraagt om clip-relatieve tijden; die worden hier omgezet naar
-    absolute seconden. Valt het model terug op vrije tekst, dan proberen we
-    alsnog een klassenaam en een tijdsbereik te vinden.
-    """
-    duration = max(0.0, clip_end_s - clip_start_s)
-    record = _json_object(text) or {}
-    action_value = _value(record, "action", "label", "klasse", "class")
-    label = _match_class(action_value, classes)
-    if label is None:
-        label = _match_class(text, classes)
-    label = label or "unknown"
-    confidence_value = _value(record, "confidence", "score", "probability")
-    if isinstance(confidence_value, str) and confidence_value.strip().endswith("%"):
-        try:
-            confidence = float(confidence_value.strip().rstrip("%")) / 100.0
-        except ValueError:
-            confidence = None
-    else:
-        confidence = _float_value(confidence_value)
-    if confidence is not None:
-        if confidence > 1.0 and confidence <= 100.0:
-            confidence /= 100.0
-        confidence = max(0.0, min(1.0, confidence))
-
-    start = _float_value(_value(record, "start_s", "start", "start_time",
-                                "start_timestamp"))
-    end = _float_value(_value(record, "end_s", "end", "end_time",
-                              "end_timestamp"))
-    if start is None or end is None:
-        numbers = re.findall(r"-?\d+(?:\.\d+)?", text)
-        if start is None and end is None and len(numbers) >= 2:
-            start, end = float(numbers[0]), float(numbers[1])
-    if start is not None:
-        start = max(0.0, min(duration, start)) + clip_start_s
-    if end is not None:
-        end = max(0.0, min(duration, end)) + clip_start_s
-    if start is not None and end is not None and end < start:
-        start, end = end, start
-    if start is not None and end is not None and end <= start:
-        start = end = None
-
-    scores = ({label: confidence}
-              if label != "unknown" and confidence is not None else {})
-    return ActionPrediction(
-        label=label,
-        confidence=confidence,
-        scores=scores,
-        start_s=start,
-        end_s=end,
-        raw_text=text.strip(),
     )
 
 
@@ -777,8 +628,4 @@ def create_action_classifier(cfg: dict, device: str,
         from duplo.actionclip import ActionClipClassifier
 
         return ActionClipClassifier(cfg, device)
-    if kind in VLM_ACTION_KINDS:
-        from duplo.vlm_actions import create_vlm_classifier
-
-        return create_vlm_classifier(cfg, device, kind)
     raise SystemExit(f"Onbekend actiemodel: {kind!r}.")

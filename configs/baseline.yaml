@@ -102,27 +102,10 @@ internvideo2_trust_remote_code: true
 actionclip_model: "ViT-B/32-8"                   # "ViT-B/32-8", "ViT-B/16-8", "ViT-B/16-16" of "ViT-B/16-32"
 # actionclip_checkpoint: "models/vit-b-32-8f.pth"   # optioneel lokaal of URL; leeg = automatisch downloaden
 actionclip_clip_cache: "models/clip"             # cache voor de OpenAI-CLIP ViT-gewichten
-# Generatieve VLM-actiemodellen (let op: Qwen3-VL is een algemene VLM,
-# geen gespecialiseerde temporele actieclassifier; meet label en tijden apart)
-smolvlm2_model: "HuggingFaceTB/SmolVLM2-2.2B-Instruct"
-llavaction_model: "MLAdaptiveIntelligence/LLaVAction-7B"
-qwen3vl_model: "Qwen/Qwen3-VL-8B-Instruct"
-vlm_frames: 8                                    # frames per clip voor VLM's
-vlm_max_new_tokens: 256                         # JSON-antwoord is kort; lager = sneller
-vlm_dtype: "auto"                                # auto = bf16 op GPU, fp32 op CPU
-vlm_clip_span: 90                                # ~3 s context voor temporele VLM's
-vlm_clip_stride: 90                              # volgende VLM-clip elke ~3 s
-# llavaction_frames: 8
-# llavaction_dtype: "bfloat16"                   # "bfloat16" of "float16"
-# llavaction_attn_implementation: "sdpa"
-llavaction_runtime_path: "third_party/llavaction_runtime"  # transformers 4.x-subprocess
 # action_ground_truth: "data/action_ground_truth.csv"  # optioneel: classificatie + temporele IoU
 save_xclip_video: true                           # debug-video per actiemodel
 save_internvideo2_video: true
 save_actionclip_video: true
-save_smolvlm2_video: true
-save_llavaction_video: true
-save_qwen3vl_video: true
 action_debug_repeat_frames: true                 # herhaal elk clipframe tot de bronfps (anders ~1 fps video)
 # Snelheid (detectie-neutraal: zelfde imgsz/drempels/gewichten, alleen snellere kernels/codering)
 yolo_half: true                            # FP16-inferentie op CUDA (Ultralytics half=True)

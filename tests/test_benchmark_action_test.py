@@ -1,10 +1,9 @@
-"""Tests voor taakbewust benchmarken, VLM-acties en temporele evaluatie."""
+"""Tests voor taakbewust benchmarken en temporele actie-evaluatie."""
 import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 import pandas as pd
 
@@ -15,12 +14,6 @@ from duplo.action_eval import (
     evaluate_action_rows,
     interval_iou,
     load_action_ground_truth,
-)
-from duplo.actions import (
-    ActionPrediction,
-    build_vlm_prompt,
-    normalize_action_model,
-    parse_vlm_action_response,
 )
 from duplo.benchmark import (
     TASK_3D_HAND_PREDICTION,
@@ -84,48 +77,6 @@ class ActionEvaluationTest(unittest.TestCase):
             json_intervals = load_action_ground_truth(json_path)
             self.assertEqual(json_intervals[0].action, "unscrew")
             self.assertEqual(json_intervals[0].start_s, 1.0)
-
-
-class VlmResponseTest(unittest.TestCase):
-    def setUp(self):
-        self.classes = ["unscrewing a screw", "idle"]
-
-    def test_json_response(self):
-        prediction = parse_vlm_action_response(
-            '```json\n{"action": "idle", "start_s": 1.5, "end_s": 3.0, '
-            '"confidence": 0.82}\n```',
-            self.classes, clip_start_s=10.0, clip_end_s=20.0)
-        self.assertEqual(prediction.label, "idle")
-        self.assertAlmostEqual(prediction.confidence, 0.82)
-        self.assertAlmostEqual(prediction.start_s, 11.5)
-        self.assertAlmostEqual(prediction.end_s, 13.0)
-
-    def test_free_text_response(self):
-        prediction = parse_vlm_action_response(
-            "The action is unscrewing a screw from 2.0 to 4.0 seconds.",
-            self.classes, clip_start_s=5.0, clip_end_s=15.0)
-        self.assertEqual(prediction.label, "unscrewing a screw")
-        self.assertAlmostEqual(prediction.start_s, 7.0)
-        self.assertAlmostEqual(prediction.end_s, 9.0)
-
-    def test_unknown_and_invalid_times(self):
-        prediction = parse_vlm_action_response(
-            "I am not sure.", self.classes, 0.0, 10.0)
-        self.assertEqual(prediction.label, "unknown")
-        self.assertIsNone(prediction.confidence)
-        self.assertIsNone(prediction.start_s)
-
-    def test_prompt_contains_classes_and_duration(self):
-        prompt = build_vlm_prompt(self.classes, 12.0, 15.0)
-        self.assertIn("unscrewing a screw", prompt)
-        self.assertIn("3.00 seconds", prompt)
-        self.assertIn('"action"', prompt)
-
-    def test_prediction_accepts_temporal_fields(self):
-        prediction = ActionPrediction(
-            "idle", None, {}, start_s=1.0, end_s=2.0, raw_text="x")
-        self.assertEqual(prediction.top_k(), [])
-        self.assertEqual(prediction.start_s, 1.0)
 
 
 class BenchmarkSummaryTest(unittest.TestCase):
@@ -215,20 +166,20 @@ class CompareTasksTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            step = root / "qwen3vl"
+            step = root / "xclip"
             step.mkdir()
             rows = [
                 action_row("v.mp4", 0, 90, 30.0, "unscrew", None,
                            start_s=0.0, end_s=3.0),
             ]
             pd.DataFrame(rows, columns=ACTION_COLUMNS).to_csv(
-                step / "qwen3vl_actions.csv", index=False)
-            (step / "qwen3vl_summary.json").write_text(json.dumps({
-                "model": "qwen3vl", "clips_processed": 1, "fps": 30.0,
+                step / "xclip_actions.csv", index=False)
+            (step / "xclip_summary.json").write_text(json.dumps({
+                "model": "xclip", "clips_processed": 1, "fps": 30.0,
                 "temporal": True,
             }), encoding="utf-8")
             summary = summarize_action_run(
-                step / "qwen3vl_actions.csv",
+                step / "xclip_actions.csv",
                 [ActionInterval("unscrew", 0.0, 3.0)])
         self.assertEqual(summary["task"], TASK_ACTION_CLASSIFICATION)
         self.assertTrue(summary["temporal"])
@@ -241,14 +192,14 @@ class CompareTasksTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             output = root / "outputs"
-            step = output / "smolvlm2"
+            step = output / "xclip"
             step.mkdir(parents=True)
             pd.DataFrame([
                 action_row("v.mp4", 0, 90, 30.0, "idle", 0.5),
             ], columns=ACTION_COLUMNS).to_csv(
-                step / "smolvlm2_actions.csv", index=False)
-            (step / "smolvlm2_summary.json").write_text(json.dumps({
-                "model": "smolvlm2", "clips_processed": 1,
+                step / "xclip_actions.csv", index=False)
+            (step / "xclip_summary.json").write_text(json.dumps({
+                "model": "xclip", "clips_processed": 1,
                 "task": "action_classification",
             }), encoding="utf-8")
             cfg_path = root / "cfg.yaml"
@@ -266,86 +217,6 @@ class CompareTasksTest(unittest.TestCase):
         self.assertNotIn("Objectdetectie / segmentatie", report)
         self.assertEqual(
             overview["tasks"][TASK_ACTION_CLASSIFICATION]["count"], 1)
-
-
-class LlavaActionRuntimeTest(unittest.TestCase):
-    def test_child_process_is_not_relaunched(self):
-        import os
-
-        import run_action_test
-
-        with mock.patch.dict(
-                os.environ, {run_action_test.LLAVACTION_ISOLATED_ENV: "1"}):
-            run_action_test.ensure_llavaction_runtime({})
-
-    def test_transformers5_needs_runtime(self):
-        import run_action_test
-
-        with mock.patch.object(
-                run_action_test, "_transformers_major", return_value=5), \
-                self.assertRaises(SystemExit) as context:
-            run_action_test.ensure_llavaction_runtime(
-                {"llavaction_runtime_path": "does-not-exist"})
-        self.assertIn("requirements-llavaction.txt", str(context.exception))
-
-    def test_present_runtime_relaunches_with_pythonpath(self):
-        import os
-
-        import run_action_test
-
-        with tempfile.TemporaryDirectory() as tmp, \
-                mock.patch.object(
-                    run_action_test, "_transformers_major", return_value=5), \
-                mock.patch("subprocess.call", return_value=0) as call, \
-                mock.patch.dict(os.environ, {}, clear=False):
-            (Path(tmp) / "transformers").mkdir()
-            (Path(tmp) / "transformers" / "__init__.py").write_text(
-                "", encoding="utf-8")
-            os.environ.pop(run_action_test.LLAVACTION_ISOLATED_ENV, None)
-            with self.assertRaises(SystemExit) as context:
-                run_action_test.ensure_llavaction_runtime(
-                    {"llavaction_runtime_path": tmp})
-            env = call.call_args.kwargs["env"]
-        self.assertEqual(context.exception.code, 0)
-        self.assertEqual(env[run_action_test.LLAVACTION_ISOLATED_ENV], "1")
-        self.assertTrue(env["PYTHONPATH"].startswith(str(Path(tmp).resolve())))
-
-
-class LlavaActionCompatibilityTest(unittest.TestCase):
-    def test_transformers4_helpers_are_added(self):
-        from transformers import modeling_utils
-
-        from duplo.vlm_actions import _patch_llavaction_transformers
-
-        _patch_llavaction_transformers()
-        for name in ("apply_chunking_to_forward",
-                     "find_pruneable_heads_and_indices",
-                     "prune_linear_layer"):
-            self.assertTrue(hasattr(modeling_utils, name))
-
-
-class VlmSelectionTest(unittest.TestCase):
-    def test_model_aliases(self):
-        self.assertEqual(normalize_action_model("Qwen3-VL-8B-Instruct"),
-                         "qwen3vl")
-        self.assertEqual(
-            normalize_action_model("MLAdaptiveIntelligence/LLaVAction-7B"),
-            "llavaction")
-        self.assertEqual(
-            normalize_action_model("HuggingFaceTB/SmolVLM2-2.2B-Instruct"),
-            "smolvlm2")
-
-    def test_factory_routes_vlm_without_loading(self):
-        from unittest import mock
-
-        from duplo.actions import create_action_classifier
-
-        with mock.patch("duplo.vlm_actions.create_vlm_classifier",
-                        return_value="classifier") as factory:
-            result = create_action_classifier({}, "cpu", "qwen3vl")
-        self.assertEqual(result, "classifier")
-        factory.assert_called_once()
-        self.assertEqual(factory.call_args.args[2], "qwen3vl")
 
 
 if __name__ == "__main__":

@@ -11,12 +11,7 @@ detectiescore worden beoordeeld.
 | `object_detection` | YOLO, RF-DETR, Grounding DINO, YOLO-World, YOLO-seg, RF-DETR-seg, SAM3, SAM 3.1, ByteTrack-varianten | `*_detections.csv` / `*_tracking_history.csv` | tooldekking, tool-frames, confidence, fps |
 | `hand_detection` | MediaPipe Hands | `hand_landmarks.csv` | frames met handen, landmarkrijen, fps |
 | `3d_hand_prediction` | VITRA | `vitra_actions.csv` | frames, actierijen, handen, chunk, fps |
-| `action_classification` | X-CLIP, InternVideo2, ActionCLIP, SmolVLM2, LLaVAction, Qwen3-VL | `*_actions.csv` | clips, labels, confidence, classificatie-accuracy, temporele IoU |
-
-LLaVAction draait vanwege de oude `llavaction`-package in een aparte
-transformers 4.x-runtime (`third_party/llavaction_runtime`, geïnstalleerd door
-`run_llavaction_test.bat`) en vereist een CUDA-GPU. Qwen3-VL en SmolVLM2 zijn
-algemene VLM's; meet hun classificatie en temporele grenzen expliciet apart.
+| `action_classification` | X-CLIP, InternVideo2, ActionCLIP | `*_actions.csv` | clips, labels, confidence, classificatie-accuracy, temporele IoU |
 
 Elke run schrijft daarnaast `<model>_summary.json`. Sinds benchmarkversie 2
 bevat die samenvatting:
@@ -49,12 +44,38 @@ De samengestelde score blijft alleen voor objectdetectie gelden. Handdetectie,
 3D-handvoorspelling en actieclassificatie hebben eigen tabellen en eigen
 metrics.
 
-## 3. Actieclassificatie en temporele localisatie
+## 3. Geselecteerde modellen en meerdere video's
+
+`src/benchmark_compare.py` is de orchestrator voor benchmarks waarbij je zelf
+de modellen en video's kiest:
+
+```bat
+run_benchmark_compare.bat --preset action --video data\Disassembly1.mp4
+run_benchmark_compare.bat --preset detection --video data\Disassembly1.mp4
+run_benchmark_compare.bat --model xclip --videos data\v1.mp4 data\v2.mp4
+```
+
+- `--preset action` = ActionCLIP vs InternVideo2 vs X-CLIP.
+- `--preset detection` = Grounding DINO vs SAM 3.1 vs YOLO-World.
+- `--model MODEL --videos ...` draait één model op meerdere video's en
+  berekent het gemiddelde per numerieke metric.
+- `--models a,b,c` en `--videos "data\*.mp4"` ondersteunen eigen selecties.
+- `--reuse` hergebruikt bestaande CSV's; `--save-videos` bewaart debugvideo's.
+- `--dry-run` toont alleen de commando's.
+
+De orchestrator schrijft automatisch naar `outputs/benchmarks/<naam>/`:
+`benchmark_report.md`, `benchmark_metrics.csv`, `benchmark_average.csv`,
+`benchmark_overview.json` en per video een gedetailleerd
+`<video>/comparison/model_comparison.md`. De gemiddelde tabel gebruikt alleen
+geslaagde runs; mislukte runs staan expliciet in het rapport en in
+`benchmark_overview.json`.
+
+## 4. Actieclassificatie en temporele localisatie
 
 Gespecialiseerde classifiers (X-CLIP, InternVideo2, ActionCLIP) geven alleen
-een label per clip. Generatieve VLM's (SmolVLM2, Qwen3-VL) en LLaVAction
-kunnen ook begin- en eindtijden genereren. Die twee prestaties worden apart
-gemeten.
+een label per clip. `action_ground_truth` voegt classificatie-accuracy toe;
+modellen die later ook begin- en eindtijden leveren, kunnen dezelfde
+temporele metrics gebruiken.
 
 ### Ground truth
 
@@ -92,18 +113,18 @@ Disassembly1.mp4,idle,21.00,24.50
 - **start/end MAE** – gemiddelde absolute fout van de grenzen in seconden;
 - **temporele labelaccuracy** – labelcorrectheid van de gematchte intervallen.
 
-De temporele voorspellingen van een VLM zijn beperkt tot het clipvenster. Een
+Temporele voorspellingen zijn beperkt tot het clipvenster. Een
 actie die over meerdere clips loopt wordt niet automatisch samengevoegd; de
 metrics zijn daarom een indicatie en geen vervanging van een gespecialiseerde
 temporal-action-localizer.
 
-## 4. Reproduceerbaarheid
+## 5. Reproduceerbaarheid
 
 - Gebruik dezelfde video, `frame_stride`, clipinstellingen en prompts.
 - De eerste inferentie kan trager zijn door modeldownload/cache; meet bij
   voorkeur een tweede run.
 - `environment` in de summary legt hardware en software vast.
 - Vergelijk geen confidence tussen modelfamilies: elke familie kalibreert
-  anders. Generatieve VLM's geven vaak helemaal geen confidence.
+  anders. Niet elk model geeft een gekalibreerde confidence.
 - Draai `run_benchmark_suite.bat` voor unittests + benchmarkrapport in één
   keer.
