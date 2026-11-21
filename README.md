@@ -26,6 +26,9 @@ Proof of concept voor het automatisch analyseren van DUPLO-disassemblyvideo's. D
 - `src/run_sam31_video.py` – SAM 3.1-segmentatie via Ultralytics (open-vocabulary, `sam3.1_multiplex.pt`, vereist Hugging Face-toegang)
 - `src/compare_models.py` – taakbewust benchmarkrapport: detectiescore plus aparte tabellen voor tracking, handdetectie, VITRA en actieclassificatie (`benchmark_overview.json`, `tracking_comparison.csv`, `action_comparison.csv`)
 - `src/benchmark_compare.py` – benchmark geselecteerde modellen op één video of één model over meerdere video's, met automatische gemiddelden en rapporten
+- `src/run_asr_test.py` / `src/asr_naar_excel.py` – spraakannotatie: ingesproken commando's (Vosk + Whisper) omzetten naar een actie-annotatie met eDIM-categorie, en het resultaat naar Excel (zie [Documentation/Spraakannotatie.md](Documentation/Spraakannotatie.md))
+- `configs/asr/` – commandolijst en vakwoorden voor de spraakannotatie
+- `requirements-asr.txt` / `run_asr_test.bat` / `run_asr_excel.bat` – eigen omgeving (`.venv-asr`) en startscripts voor de spraakannotatie
 - `requirements.txt` / `requirements-vitra.txt` – hoofd- en geïsoleerde VITRA-runtime-dependencies
 - `run_common.bat` – gedeelde venv + pip fast-check (hash van `requirements.txt`; `pip install` wordt overgeslagen bij ongewijzigde hash; forceer met `--upgrade`)
 - `run_yolo_test.bat` / `run_handpose_test.bat` / `run_tracking_test.bat` / `run_rfdetr_test.bat` / `run_rfdetr_seg_test.bat` / `run_grounding_dino_test.bat` / `run_yolo_world_test.bat` / `run_yolo_seg_test.bat` / `run_sam3_test.bat` / `run_sam31_test.bat` / `run_sam31_tracking_test.bat` / `run_vitra_test.bat` / `run_xclip_test.bat` / `run_internvideo2_test.bat` / `run_actionclip_test.bat` / `run_smolvlm2_test.bat` / `run_internvideo25_test.bat` / `run_internvideo3_test.bat` / `run_compare_models.bat` / `run_benchmark.bat` / `run_benchmark_suite.bat` / `run_benchmark_compare.bat` / `run_unit_tests.bat` – dunne startscripts voor Windows (roepen `run_common.bat` aan)
@@ -411,3 +414,4 @@ Zonder argument gebruiken de scripts de waarde van `device` in `configs\baseline
 ## Voortgang
 
 Tijdens het draaien wordt de voortgang direct getoond: in een console een balk die op één regel bijwerkt, en bij vastgelegde uitvoer (logbestand of IDE-paneel) voortgangsregels bij elke 10% of elke 5 seconden.
+

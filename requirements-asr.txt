@@ -1,0 +1,5 @@
+faster-whisper==1.2.1
+av<19        # PyAV 19 werkt (nog) niet met faster-whisper 1.2.1
+vosk
+numpy
+openpyxl

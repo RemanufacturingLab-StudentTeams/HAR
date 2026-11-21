@@ -195,3 +195,7 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+# Spraakannotatie: eigen omgeving en opnames (persoonsgegevens)
+.venv-asr/
+data/*.wav
+data/*.m4a

@@ -1,0 +1,15 @@
+video,start_s,end_s,label,edim,notes
+opname_3min.m4a,,,fixate,Fix,stap 1 vasthouden
+opname_3min.m4a,,,rotate_object,Manipulate,stap 2 draai om
+opname_3min.m4a,,,identify,Identity,stap 3 zoek verbinding
+opname_3min.m4a,,,tool_pick_up,Tool Change,stap 4 pak spatel
+opname_3min.m4a,,,pry_component,Disconnect,stap 5 glijvoetje wrikken
+opname_3min.m4a,,,tool_put_down,Tool Change,stap 6 leg neer
+opname_3min.m4a,,,tool_pick_up,Tool Change,stap 7 pak schroevendraaier
+opname_3min.m4a,,,tool_position,Tool Position,stap 8 plaats gereedschap
+opname_3min.m4a,,,screw_unscrew,Disconnect,stap 9 schroef losdraaien
+opname_3min.m4a,,,tool_put_down,Tool Change,stap 10 leg neer
+opname_3min.m4a,,,pry_component,Disconnect,stap 11 bovenkap losklikken
+opname_3min.m4a,,,component_remove,Removal,stap 12 bovenkap eraf
+opname_3min.m4a,,,disconnect_other,Disconnect,stap 13 kabelstekker los
+opname_3min.m4a,,,component_remove,Removal,stap 14 printplaat eruit
