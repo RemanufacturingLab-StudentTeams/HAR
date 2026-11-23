@@ -1,0 +1,4 @@
+model,gem_fout_start_s,max_fout_start_s,gem_fout_eind_s,max_fout_eind_s,gem_fout_start_frames,gem_fout_eind_frames,starts_binnen_0.1s,einden_binnen_0.1s
+Vosk,0.04,0.09,0.02,0.03,1.1,0.5,14,14
+Whisper small,0.81,1.55,0.46,2.26,24.3,13.9,0,2
+Whisper medium,0.1,0.64,1.08,2.49,2.9,32.4,11,0
